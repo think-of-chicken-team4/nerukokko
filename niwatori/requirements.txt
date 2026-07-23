@@ -1,0 +1,13 @@
+bleak>=0.22
+acconeer-exptool>=7.18
+supabase>=2.0
+
+# acconeer-exptool同梱の a111.algo.breathing (2022年から未更新) は
+# NumPy 2.0で厳格化された配列→スカラー代入の仕様に非対応でクラッシュするため、
+# 1.x系に固定する(numpy>=2 install時はscipyも連動して2.x系が入るため両方固定)。
+numpy<2
+scipy<1.14
+
+# sounddeviceの実行にはシステムのPortAudioライブラリが必要
+# (Raspberry Pi OS: sudo apt install libportaudio2)
+sounddevice>=0.4
