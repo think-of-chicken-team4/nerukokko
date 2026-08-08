@@ -10,7 +10,7 @@ import integration_config as config
 from egg_state import EggState
 from mic_sensor import MicSensor
 from radar_sensor import RadarSensor
-from supabase_client import SupabaseSender
+from ingest_client import IngestClient
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ class Integrator:
         egg_state: EggState,
         radar_sensor: RadarSensor,
         mic_sensor: MicSensor,
-        sender: SupabaseSender,
+        sender: IngestClient,
     ) -> None:
         self._egg_state = egg_state
         self._radar_sensor = radar_sensor

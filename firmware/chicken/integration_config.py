@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import os
 
-# --- Supabase ---
+# --- Supabase Edge Function (ingest-sensor-data) ---
+# 鶏→サーバーはHTTP REST。docs/software-spec.md の Edge Function構成を参照。
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
-SUPABASE_TABLE = os.environ.get("SUPABASE_TABLE", "sleep_records")
+INGEST_FUNCTION_NAME = os.environ.get("INGEST_FUNCTION_NAME", "ingest-sensor-data")
 
 # --- 統合レコード送信間隔("一定間隔(例:1分ごと)") ---
 AGGREGATION_INTERVAL_SEC = float(os.environ.get("AGGREGATION_INTERVAL_SEC", "60"))

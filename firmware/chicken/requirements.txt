@@ -1,6 +1,6 @@
 bleak>=0.22
 acconeer-exptool>=7.18
-supabase>=2.0
+requests>=2.31
 
 # acconeer-exptool同梱の a111.algo.breathing (2022年から未更新) は
 # NumPy 2.0で厳格化された配列→スカラー代入の仕様に非対応でクラッシュするため、

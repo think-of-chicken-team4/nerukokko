@@ -13,7 +13,7 @@ from integrator import Integrator
 from mic_sensor import MicSensor
 from radar_sensor import RadarSensor
 from sensor_data import AudioLevel, DockEvent, Environment, MotionEvent
-from supabase_client import SupabaseSender
+from ingest_client import IngestClient
 
 egg_state = EggState()
 
@@ -44,7 +44,7 @@ async def main() -> None:
 
     radar_sensor = RadarSensor()
     mic_sensor = MicSensor()
-    sender = SupabaseSender()
+    sender = IngestClient()
     integrator = Integrator(egg_state, radar_sensor, mic_sensor, sender)
 
     radar_sensor.start()
