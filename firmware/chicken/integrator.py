@@ -8,6 +8,7 @@ import logging
 
 import integration_config as config
 from egg_state import EggState
+from environment_sensor import EnvironmentSensor
 from mic_sensor import MicSensor
 from radar_sensor import RadarSensor
 from ingest_client import IngestClient
@@ -21,11 +22,13 @@ class Integrator:
         egg_state: EggState,
         radar_sensor: RadarSensor,
         mic_sensor: MicSensor,
+        environment_sensor: EnvironmentSensor,
         sender: IngestClient,
     ) -> None:
         self._egg_state = egg_state
         self._radar_sensor = radar_sensor
         self._mic_sensor = mic_sensor
+        self._environment_sensor = environment_sensor
         self._sender = sender
 
     async def run_forever(self) -> None:
@@ -45,11 +48,15 @@ class Integrator:
             .isoformat()
             .replace("+00:00", "Z")
         )
+        environment = self._environment_sensor.get_latest()
         return {
             "timestamp": timestamp,
             "chicken": {
                 "breathing_rate": self._radar_sensor.get_latest_breathing_rate(),
                 "mic_level": self._mic_sensor.get_latest_level(),
+                "temperature": environment["temperature"],
+                "humidity": environment["humidity"],
+                "lux": environment["lux"],
             },
             "egg": self._egg_state.snapshot(),
         }

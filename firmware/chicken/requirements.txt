@@ -11,3 +11,6 @@ scipy<1.14
 # sounddeviceの実行にはシステムのPortAudioライブラリが必要
 # (Raspberry Pi OS: sudo apt install libportaudio2)
 sounddevice>=0.4
+
+# 照度センサー(SEN0097/BH1750)のI2C通信用
+smbus2>=0.4

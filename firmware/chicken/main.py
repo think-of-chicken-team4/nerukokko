@@ -9,6 +9,7 @@ import logging
 
 from ble_client import TamagoClient
 from egg_state import EggState
+from environment_sensor import EnvironmentSensor
 from integrator import Integrator
 from mic_sensor import MicSensor
 from radar_sensor import RadarSensor
@@ -44,11 +45,13 @@ async def main() -> None:
 
     radar_sensor = RadarSensor()
     mic_sensor = MicSensor()
+    environment_sensor = EnvironmentSensor()
     sender = IngestClient()
-    integrator = Integrator(egg_state, radar_sensor, mic_sensor, sender)
+    integrator = Integrator(egg_state, radar_sensor, mic_sensor, environment_sensor, sender)
 
     radar_sensor.start()
     mic_sensor.start()
+    environment_sensor.start()
 
     ble_client = TamagoClient(
         on_audio=on_audio,

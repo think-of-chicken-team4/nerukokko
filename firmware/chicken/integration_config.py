@@ -25,3 +25,7 @@ RADAR_SENSOR_ID = int(os.environ.get("RADAR_SENSOR_ID", "1"))
 MIC_DEVICE = os.environ.get("MIC_DEVICE")  # sounddeviceのデバイス名/インデックス。未指定ならシステム既定入力
 MIC_SAMPLE_RATE = int(os.environ.get("MIC_SAMPLE_RATE", "16000"))
 MIC_BLOCK_SIZE = int(os.environ.get("MIC_BLOCK_SIZE", "1024"))
+
+# --- 鶏本体 環境センサー(温湿度 M0235-1747, 照度 SEN0097=BH1750) ---
+I2C_BUS_NUMBER = int(os.environ.get("I2C_BUS_NUMBER", "1"))
+ENVIRONMENT_POLL_INTERVAL_SEC = float(os.environ.get("ENVIRONMENT_POLL_INTERVAL_SEC", "30"))
