@@ -24,7 +24,7 @@
 
 - **利用対象者**：睡眠に悩みを抱える10〜30代の学生・社会人
 - **キーワード**：睡眠改善 / キャラクター / 生活習慣
-- **制限事項**：小児への光刺激に注意、スマートフォン・Wi-Fi環境が必要、カメラは非搭載（プライバシー配慮）
+- **制限事項**：小児への光刺激に注意、Wi-Fi環境が必要（鶏ユニット）、カメラは非搭載（プライバシー配慮）
 
 ## 製品概要
 
@@ -34,7 +34,7 @@
 
 | ユニット | 役割 |
 |---|---|
-| 🐔 にわとり本体 | LED光目覚まし、スピーカー・マイクによる音声会話、温湿度・照度・ミリ波レーダー計測 |
+| 🐔 にわとり本体 | LED光目覚まし、スピーカー・マイクによる音声会話、温湿度・照度・ミリ波レーダー計測、たまごとのBLE受信・クラウドとの通信を担う中枢 |
 | 🥚 たまごセンサー | 加速度センサーによる寝返り検出、マイクによるいびき・寝言検出、装着不要でベッドに置くだけ |
 | 🪺 巣（充電ステーション） | たまごの充電。充電開始検知＝アラーム停止（二度寝防止） |
 
@@ -42,24 +42,39 @@
 
 ## システム構成
 
-3層構成で、鶏・たまごがBLEで連携し、鶏がWi-Fi経由でクラウド（Supabase）・Gemini API・Google Calendarと通信します。
+鶏ユニットが中枢（ゲートウェイ）となり、たまごとはBLEで、クラウドとはHTTP RESTで通信する構成です。
 
 ```
-[スマホアプリ (Next.js)]
-        ↕ HTTPS REST
+[Webアプリ (Next.js)]
+        ↕ HTTP REST
 [バックエンド / DB (Supabase)]
    ├─ Edge Functions（センサー取込・AI会話・就寝提案・朝サマリー）
-   ├─ PostgreSQL（全14テーブル）
+   ├─ PostgreSQL
    └─ 外部API連携（Gemini / Google Calendar / Google STT・TTS）
-        ↕ Wi-Fi (HTTPS)
-[デバイス層 (ESP32)]
-   ├─ 鶏ユニット（LED・スピーカー・マイク・ミリ波レーダー・温湿度・照度）
-   └─ たまごユニット（加速度センサー・マイク・充電検知） ⇄ BLE ⇄ 鶏
+        ↕ Wi-Fi (HTTP REST)
+[鶏ユニット (Raspberry Pi 3 Model B / Python)]
+   ├─ ミリ波レーダー（Acconeer A111、公式SDKで呼吸検知）
+   ├─ マイク（SPH0645LM4H, I2S）、LED、スピーカー、温湿度・照度センサー
+   └─ BLE Central（bleakでたまごからのNotify受信）
+        ↕ BLE（たまご→鶏の一方向、Notifyのみ）
+[たまごユニット (ESP32 / PlatformIO / NimBLE-Arduino, BLE Peripheral)]
+   ├─ 加速度センサー、PDMマイク（ADA-4346）、温湿度・照度センサー
+   └─ 充電モジュールのSTATピンでドック検知（起床/就寝）
         ↕ 物理接続（充電）
 [巣（充電ステーション）]
 ```
 
-起床・二度寝防止の設計思想：「ユーザーがベッド上にいるか」ではなく「たまごが巣に戻ったか（充電開始）」をBLE経由で検知してアラームを停止する。
+### BLE通信仕様（鶏⇔たまご）
+- 通信方向：たまご→鶏の一方向のみ（鶏からたまごへのWrite/コマンド送信はなし）
+- GATT Characteristicは4種類（詳細は `docs/ble-protocol.md` を参照）：
+  - **Audio Level**：マイク音量レベル（uint16_t、0.2〜0.5秒ごとNotify）
+  - **Motion Event**：加速度x/y/z（int16_t×3、イベント時＋数秒に1回Notify）
+  - **Environment**：温湿度・照度（float×2+uint16_t、30秒〜1分ごとNotify）
+  - **Dock Event**：起床/就寝検知（uint8_t、充電モジュールSTATピンのエッジ検知時のみNotify）
+- データ形式：JSONではなくバイナリ構造体（struct）をそのままパックする方式
+
+### 起床・二度寝防止の設計思想
+「ユーザーがベッド上にいるか」ではなく「たまごが巣に戻ったか（充電開始＝Dock Event）」をBLE経由で検知してアラームを停止する。
 
 睡眠スコアは以下の重み付けで算出（詳細は `docs/software-spec.md` を参照）：
 
@@ -72,10 +87,11 @@
 | 領域 | 決定内容 |
 |---|---|
 | Webアプリ | Next.js（React + TypeScript） |
-| ファームウェア開発ツール | PlatformIO（VSCode拡張） |
-| BLE通信ライブラリ | NimBLE-Arduino |
+| 鶏ユニット | Raspberry Pi 3 Model B、Python、Acconeer公式SDK（A111制御）、bleak（BLE Central） |
+| たまごファームウェア開発ツール | PlatformIO（VSCode拡張） |
+| BLE通信ライブラリ（たまご側） | NimBLE-Arduino |
 | バックエンド／DB | Supabase（PostgreSQL + Edge Functions + Realtime + Auth + Storage） |
-| ESP32⇔サーバー通信 | HTTPS REST |
+| 鶏⇔サーバー通信 | HTTP REST |
 | AI連携 | Gemini API（Edge Function経由） |
 | カレンダー連携 | Google Calendar API（Edge Function経由） |
 | 音声認識／音声合成 | Google Cloud Speech-to-Text ／ Text-to-Speech |
@@ -90,19 +106,20 @@ nerukokko/
 │   ├── software-spec.md   # ソフトウェア仕様書（DB設計・データフロー・フローチャート）
 │   ├── design-review.md   # 創造設計デザインレビュー資料
 │   ├── api-spec.md        # フロント⇔サーバー API仕様（作成予定）
-│   └── ble-protocol.md    # 鶏⇔たまご BLE仕様（作成予定）
-├── app/                   # スマホアプリ（Next.js）
+│   └── ble-protocol.md    # 鶏⇔たまご BLE仕様
+├── app/                   # スマホ/Webアプリ（Next.js）
 ├── server/                # バックエンド（Supabase Edge Functions）
 └── firmware/
-    ├── chicken/           # 鶏ユニット（ESP32）
-    └── egg/                # たまごユニット（ESP32）
+    ├── chicken/           # 鶏ユニット（Raspberry Pi / Python）
+    └── egg/                # たまごユニット（ESP32 / PlatformIO）
 ```
 
 ## ドキュメント
 
 - 完全仕様書：製品コンセプト・ハードウェア構成・ソフトウェア構成の全体像
-- ソフトウェア仕様書 ver3：DBスキーマ（全14テーブル・ER図）、データフロー図、フローチャート（1日の状態遷移／起床・二度寝防止シーケンス／音声対話フロー）
+- ソフトウェア仕様書：DBスキーマ、データフロー図、フローチャート（1日の状態遷移／起床・二度寝防止シーケンス／音声対話フロー）
 - 創造設計デザインレビュー資料：予算、開発スケジュール（ガントチャート）、担当分担
+- BLE仕様書：鶏⇔たまご間のGATT Characteristic構成・データフォーマット
 
 各PDFは `docs/` 配下にアップロードし、参照リンクをこの表に追加してください。
 
@@ -118,3 +135,6 @@ nerukokko/
 - サブリーダー：内海 圭吾
 - HW担当：松島 蓮、田村 愛琉、浅井 蒼輝
 - SW担当：内海 圭吾、岡田 蓮、渡邉 健太
+  - フロントエンド：内海 圭吾
+  - バックエンド／AI：渡邉 健太
+  - 組み込み（鶏・たまごFW）：岡田 蓮
