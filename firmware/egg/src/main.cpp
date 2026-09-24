@@ -29,6 +29,8 @@ void setup() {
     environmentSensor.begin();
     dockSensor.begin();
     bleManager.begin();
+
+    Serial.println("[Setup] complete. Advertising as NeruKokko-Tamago.");
 }
 
 void loop() {
@@ -38,6 +40,7 @@ void loop() {
         lastAudioNotifyMs = now;
         AudioLevelData audio{audioSensor.readLevel()};
         bleManager.notifyAudio(audio);
+        Serial.printf("[Audio] level=%u\n", audio.level);
     }
 
     if (now - lastMotionPollMs >= MOTION_POLL_INTERVAL_MS) {
@@ -46,19 +49,25 @@ void loop() {
         if (motionSensor.checkThresholdEvent(motion)) {
             bleManager.notifyMotion(motion);
             lastMotionFallbackMs = now;
+            Serial.printf("[Motion] threshold event x=%d y=%d z=%d\n", motion.x, motion.y, motion.z);
         } else if (now - lastMotionFallbackMs >= MOTION_FALLBACK_INTERVAL_MS) {
             lastMotionFallbackMs = now;
-            bleManager.notifyMotion(motionSensor.read());
+            MotionEventData fallback = motionSensor.read();
+            bleManager.notifyMotion(fallback);
+            Serial.printf("[Motion] fallback x=%d y=%d z=%d\n", fallback.x, fallback.y, fallback.z);
         }
     }
 
     if (now - lastEnvNotifyMs >= ENV_NOTIFY_INTERVAL_MS) {
         lastEnvNotifyMs = now;
-        bleManager.notifyEnvironment(environmentSensor.read());
+        EnvironmentData env = environmentSensor.read();
+        bleManager.notifyEnvironment(env);
+        Serial.printf("[Environment] temp=%.2f humidity=%.2f lux=%u\n", env.temperature, env.humidity, env.lux);
     }
 
     DockEventData dock;
     if (dockSensor.pollEvent(dock)) {
         bleManager.notifyDock(dock);
+        Serial.printf("[Dock] docked=%u\n", dock.docked);
     }
 }
