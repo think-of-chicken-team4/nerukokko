@@ -128,14 +128,25 @@
 
 ## 8. よく使うコマンド
 
-雛形を作ったら、ここにコマンドを追記する（`docs/dev-plan.md` の T-004・T-006）。
-
 ```bash
-# 鶏ユニット（Python）の構文チェック
+# --- バックエンド（server/） ---
+cd server && npm install          # 初回のみ（Supabase CLI と DB テスト用の PGlite が入る）
+npm run test:db                   # マイグレーションを PGlite に適用して制約・RLS・RPC をテスト（Docker 不要）
+npx supabase migration new <名前>  # 新しいマイグレーションを作る（既存のマイグレーションは書き換えない）
+npx supabase start                # ローカルの Supabase 一式を起動（Docker が必要）
+npx supabase db reset             # ローカル DB を作り直してマイグレーションと seed を適用
+
+# --- 鶏ユニット（Python）の構文チェック ---
 python3 -m py_compile firmware/chicken/*.py
-# たまごFWのビルド（PlatformIO CLI）
+
+# --- たまごFWのビルド（PlatformIO CLI） ---
 cd firmware/egg && pio run
 ```
+
+Webアプリ（`app/`）のコマンドは雛形を作ったら追記する（`docs/dev-plan.md` の T-006）。
+
+- マイグレーションを追加・変更したら、`npm run test:db` を通し、必要ならテスト（`server/tests/db/schema.test.mjs`）も追加する。
+- 適用済みのマイグレーションファイルは書き換えず、変更は新しいファイルで行う（本番 DB と履歴がずれるため）。
 
 ## 9. 作業の進め方（Claude 向け手順）
 

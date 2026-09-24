@@ -77,14 +77,13 @@
 
 ## 4. データベース
 
-`docs/software-spec.md` §2 の14テーブルをそのまま採用し、実装上必要な以下を追加する（T-005 で確定し、`docs/software-spec.md` にも反映する）。
+`docs/software-spec.md` §2 の14テーブルをもとに、実装に必要な変更を加えたスキーマを `server/supabase/migrations/20260924120000_initial_schema.sql` に作成した（変更点の一覧は `docs/api-spec.md` §7）。
+主な変更：`users` を Supabase Auth と紐付け、鶏の認証用に `device_tokens` を追加、再送時の重複を防ぐ一意制約、進行中セッションは1ユーザー1件まで、スコアの内訳（`score_details`）、就寝提案に「明日の予定」と「起きる時刻」を追加。
 
-| 追加 | 目的 |
-|---|---|
-| `users.id` を `auth.users.id` と同じ値にする | Supabase Auth と紐付けるため |
-| `devices` にデバイス認証用のトークン（ハッシュ）列を追加 | 鶏からの POST を認証するため |
-| `google_credentials`（新テーブル） | カレンダー用の refresh token を保存（クライアントからは読めないようにする） |
-| `sleep_sessions.chicken_device_id / egg_device_id` を NULL 可にするか検討 | デバイス未登録でもシミュレーターで試せるようにするため |
+- RLS：クライアントは自分のデータだけ読める。計測データ・会話・提案の書き込みは Edge Function だけ。
+- RPC：`register_device`（デバイス登録とトークン発行）、`next_alarm_at`（次に鳴らすアラーム時刻）。
+- テスト：`cd server && npm run test:db`（PGlite で制約・RLS・RPC を確認。Docker 不要）。
+- カレンダー用の `google_credentials` は T-205 で追加する。
 
 ## 5. 画面仕様
 
@@ -120,7 +119,7 @@
 ### 5-3. 睡眠セッションのライフサイクル（提案 → §9 Q3 で確定）
 
 1. 就寝準備画面で「眠りにつく」→ Webアプリが `sleep_sessions` を作成（`status = in_progress`、`planned_wake_time` = 次のアラーム時刻）
-2. 鶏は `device-sync` でセッションIDと起床時刻を受け取り、計測データを `session_id` 付きで送る
+2. 鶏は `device-sync` で起床時刻を受け取り、計測データを送る（どのセッションに入れるかは、サーバーが計測時刻から判定する。`docs/api-spec.md` §3-1）
 3. 起床時刻になると鶏がローカルでアラームを鳴らす（在床確認はしない）
 4. たまごが巣に戻る → BLE で鶏へ → 鶏がアラームを止め、`charge_start` を即時 POST
 5. サーバーがセッションを完了（`actual_wake_time`・`end_time`・`status = completed`）→ スコア算出＋コメント生成 → Realtime でアプリに反映
@@ -158,9 +157,9 @@
 |---|---|---|---|---|
 | T-001 | 開発ルール整備（CLAUDE.md・CONTRIBUTING.md・dev-plan・PRテンプレート） | O | 🟡 | main にマージされ、全員が読める |
 | T-002 | `ren` ブランチのレビューとマージ | O | ✅ | PR #2 でマージ済み。残りの指摘は Issue #3〜#6 |
-| T-003 | `docs/api-spec.md` 作成（ingest / device-sync / chat / voice-chat の契約、デバイス認証） | O | ⬜ | 組み込み担当と合意。リクエスト・レスポンスの JSON 例とエラー仕様がある |
-| T-004 | アカウント作成（Supabase・Gemini API キー・Google Cloud の OAuth クライアント・Vercel）と Supabase CLI 初期化（`server/supabase/`） | O | ⬜ | 作成手順が docs にあり、キーは各自の `.env` とSupabaseのシークレットにだけ入っている。`npx supabase` で migrations・functions を管理でき、コマンドが CLAUDE.md §8 にある |
-| T-005 | DBマイグレーション（全テーブル・インデックス・CHECK・RLS・ユーザー初期化トリガー・シード） | O | ⬜ | 空のDBに適用でき、他人のデータが読めないことを確認済み。型を生成できる |
+| T-003 | `docs/api-spec.md` 作成（ingest / device-sync / chat / voice-chat の契約、デバイス認証） | O | 🟡 v0.1ドラフト作成済み。岡田と合意待ち | 組み込み担当と合意。リクエスト・レスポンスの JSON 例とエラー仕様がある |
+| T-004 | アカウント作成（Supabase・Gemini API キー・Google Cloud の OAuth クライアント・Vercel）と Supabase CLI 初期化（`server/supabase/`） | O | 🟡 CLI初期化済み（`server/supabase/`）。アカウント作成待ち | 作成手順が docs にあり、キーは各自の `.env` とSupabaseのシークレットにだけ入っている。`npx supabase` で migrations・functions を管理でき、コマンドが CLAUDE.md §8 にある |
+| T-005 | DBマイグレーション（全テーブル・インデックス・CHECK・RLS・ユーザー初期化トリガー・シード） | O | 🟡 マイグレーションとテスト済み。型生成は T-006 で | 空のDBに適用でき、他人のデータが読めないことを確認済み。型を生成できる |
 | T-006 | Next.js 雛形（`app/`）：TS・Tailwind・ESLint・Supabase クライアント・ログイン・共通レイアウト | O | ⬜ | ログイン→ホーム表示→ログアウトができる。`npm run build` が通る。コマンドが CLAUDE.md §8 にある |
 | T-007 | CI（GitHub Actions）：app の lint・型チェック・ビルド、egg の `pio run`、chicken の構文チェック | S | ⬜ | PR ごとに自動実行される |
 
