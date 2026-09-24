@@ -107,8 +107,9 @@ nerukokko/
 │   ├── full-spec.md       # 完全仕様書
 │   ├── software-spec.md   # ソフトウェア仕様書（DB設計・データフロー・フローチャート）
 │   ├── ble-protocol.md    # 鶏⇔たまご BLE仕様
-│   ├── api-spec.md        # 鶏・Webアプリ⇔サーバー API仕様（作成予定）
-│   ├── dev-plan.md        # Webアプリ・バックエンドの開発計画（要件・タスク・決定ログ）
+│   ├── api-spec.md        # 鶏・Webアプリ⇔サーバー API仕様
+│   ├── hw-verification.md # 実機検証・調整の一覧と手順
+│   ├── dev-plan.md        # ソフトウェアの開発計画（要件・タスク・決定ログ）
 │   └── reviews/           # PR レビューの記録
 ├── app/                   # スマホ/Webアプリ（Next.js）
 ├── server/                # バックエンド（Supabase Edge Functions）
@@ -122,7 +123,9 @@ nerukokko/
 - [完全仕様書](docs/full-spec.md)：製品コンセプト・ハードウェア構成・ソフトウェア構成の全体像
 - [ソフトウェア仕様書](docs/software-spec.md)：DBスキーマ、データフロー図、フローチャート（1日の状態遷移／起床・二度寝防止シーケンス／音声対話フロー）
 - [BLE仕様書](docs/ble-protocol.md)：鶏⇔たまご間のGATT Characteristic構成・データフォーマット
-- [開発計画書](docs/dev-plan.md)：Webアプリ・バックエンドの要件、画面仕様、タスク一覧、決定ログ、未決事項
+- [開発計画書](docs/dev-plan.md)：ソフトウェアの要件、画面仕様、タスク一覧、決定ログ、未決事項
+- [API仕様書](docs/api-spec.md)：鶏・Webアプリとサーバーの通信の決まり
+- [実機検証の一覧](docs/hw-verification.md)：実機での検証・調整の項目と手順（ソフトウェア担当で分担）
 
 創造設計デザインレビュー資料（予算・ガントチャート・担当分担）、部品購入リスト、動作フロー図（drawio）の原本は、リポジトリの外（チームの共有フォルダ）で管理しています。このリポジトリは公開されているため、学校の資料や個人情報を含むファイルはアップロードしないでください。
 
@@ -137,7 +140,8 @@ nerukokko/
 - APIキー・パスワード・Wi-Fi情報は絶対にコミットしないでください（このリポジトリは公開されています）
 - タスク管理は [開発計画書](docs/dev-plan.md) と GitHub Issue で行います。ラベルは `frontend` `backend` `firmware` を使います
 - 開発スケジュールは創造設計デザインレビュー資料のガントチャートを参照してください（4月〜2月、30週間）
-- Claude Code を使う場合は、[CLAUDE.md](CLAUDE.md) のルールに従ってもらいます
+- コードは AI（Claude Code など）に書かせてかまいません。AI には最初に [CLAUDE.md](CLAUDE.md) と [CONTRIBUTING.md](CONTRIBUTING.md) を読ませてください（Claude Code はリポジトリのフォルダで起動すれば自動で読み込みます）
+- 実機での検証・調整は AI にはできないので、ソフトウェア担当で分担します（[実機検証の一覧](docs/hw-verification.md)）
 
 ## メンバー
 
