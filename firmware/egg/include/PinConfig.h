@@ -8,13 +8,13 @@ constexpr int PDM_DATA_PIN = 33;
 constexpr uint32_t AUDIO_SAMPLE_RATE_HZ = 16000;
 constexpr uint32_t AUDIO_NOTIFY_INTERVAL_MS = 300; // 0.2〜0.5秒ごと
 
-// --- Accelerometer (SEN0142, analog triple axis) ---
-constexpr int ACCEL_X_PIN = 34;
-constexpr int ACCEL_Y_PIN = 35;
-constexpr int ACCEL_Z_PIN = 36;
+// --- Accelerometer (SEN0142 = MPU-6050, I2C。ピン: VIN/GND/SDA/SCL/INT、AD0未配線のためアドレスは既定の0x68) ---
 constexpr uint32_t MOTION_POLL_INTERVAL_MS = 100;     // 閾値監視の周期
 constexpr uint32_t MOTION_FALLBACK_INTERVAL_MS = 5000; // 保険の定期送信
-constexpr int16_t MOTION_THRESHOLD = 400;              // 前回値との差分がこれを超えたらイベント送信
+// 前回値との差分がこれを超えたらイベント送信。
+// アナログADC値時代の閾値をそのまま残しており、MPU-6050の生値(±2gで16384LSB/g)には
+// 未対応。実機で寝返りをさせて再調整すること(hw-verification.md E1、Issue #3)。
+constexpr int16_t MOTION_THRESHOLD = 400;
 
 // --- Temperature & Humidity (SEN0137, I2C SHT20 protocol) ---
 constexpr uint8_t SHT20_I2C_ADDR = 0x40;
