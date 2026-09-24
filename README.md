@@ -101,11 +101,15 @@
 ```
 nerukokko/
 ├── README.md
+├── CONTRIBUTING.md        # チーム開発ルール（ブランチ・コミット・PR）
+├── CLAUDE.md              # Claude Code 向けの開発ガイド
 ├── docs/                  # 仕様書・設計資料
 │   ├── full-spec.md       # 完全仕様書
 │   ├── software-spec.md   # ソフトウェア仕様書（DB設計・データフロー・フローチャート）
 │   ├── ble-protocol.md    # 鶏⇔たまご BLE仕様
-│   └── api-spec.md        # 鶏・Webアプリ⇔サーバー API仕様（作成予定）
+│   ├── api-spec.md        # 鶏・Webアプリ⇔サーバー API仕様（作成予定）
+│   ├── dev-plan.md        # Webアプリ・バックエンドの開発計画（要件・タスク・決定ログ）
+│   └── reviews/           # PR レビューの記録
 ├── app/                   # スマホ/Webアプリ（Next.js）
 ├── server/                # バックエンド（Supabase Edge Functions）
 └── firmware/
@@ -118,14 +122,22 @@ nerukokko/
 - [完全仕様書](docs/full-spec.md)：製品コンセプト・ハードウェア構成・ソフトウェア構成の全体像
 - [ソフトウェア仕様書](docs/software-spec.md)：DBスキーマ、データフロー図、フローチャート（1日の状態遷移／起床・二度寝防止シーケンス／音声対話フロー）
 - [BLE仕様書](docs/ble-protocol.md)：鶏⇔たまご間のGATT Characteristic構成・データフォーマット
+- [開発計画書](docs/dev-plan.md)：Webアプリ・バックエンドの要件、画面仕様、タスク一覧、決定ログ、未決事項
 
 創造設計デザインレビュー資料（予算・ガントチャート・担当分担）、部品購入リスト、動作フロー図（drawio）の原本は、リポジトリの外（チームの共有フォルダ）で管理しています。このリポジトリは公開されているため、学校の資料や個人情報を含むファイルはアップロードしないでください。
 
 ## 開発の進め方
 
-- `main` ブランチは保護されており、直接pushはできません。変更は必ずブランチを切ってPull Requestを作成し、レビュー承認後にマージしてください
-- タスク管理はGitHub Projects（カンバンボード）＋ Issueで行います。ラベルは `frontend` `backend` `firmware` を使用します
+**作業を始める前に [CONTRIBUTING.md](CONTRIBUTING.md) を必ず読んでください。** 要点は次のとおりです。
+
+- `main` ブランチは保護されていて、直接 push できません。各自の個人ブランチ（例：`aryu`、`ren`）で作業し、Pull Request で `main` に入れます
+- 作業を始める前に `git pull` と `git merge origin/main` で最新にします
+- コミットメッセージは `<種類>(<範囲>): <日本語の要約>`（例：`feat(app): 設定画面にアラーム編集フォームを追加`）
+- PR は田村（PM）が Claude Code でレビューしてマージします。FW の PR には、実機で何を確認したかを書いてください
+- APIキー・パスワード・Wi-Fi情報は絶対にコミットしないでください（このリポジトリは公開されています）
+- タスク管理は [開発計画書](docs/dev-plan.md) と GitHub Issue で行います。ラベルは `frontend` `backend` `firmware` を使います
 - 開発スケジュールは創造設計デザインレビュー資料のガントチャートを参照してください（4月〜2月、30週間）
+- Claude Code を使う場合は、[CLAUDE.md](CLAUDE.md) のルールに従ってもらいます
 
 ## メンバー
 

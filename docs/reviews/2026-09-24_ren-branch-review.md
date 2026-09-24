@@ -18,7 +18,12 @@
 
 | # | 内容 | 対応案 |
 |---|---|---|
-| M1 | README の「ディレクトリ構成」「ドキュメント」に、リポジトリに存在しないファイル（`docs/design-review.pptx`、`docs/parts-sourcing.xlsx`、`docs/flowcharts/*.drawio`）が載っている | 実ファイルを追加するか、「原本は共有ドライブで管理」と書き換える。リポジトリは公開なので、学校の著作権表示がある資料は入れない方が安全 |
+| M1 | README の「ディレクトリ構成」「ドキュメント」に、リポジトリに存在しないファイル（`docs/design-review.pptx`、`docs/parts-sourcing.xlsx`、`docs/flowcharts/*.drawio`）が載っている | ✅ 対応済み：参照を削除し、「原本はリポジトリ外で管理」と記載（PR #2 でマージ） |
+
+## 対応状況（2026-09-24）
+
+- PR #2 で main にマージ済み。
+- S1 → Issue #3、S2・S3・S8 → Issue #4（環境センサーは鶏に一本化することに決定）、S4 → Issue #5、S5・S6・S7 → Issue #6。担当は岡田（frisk00000）。
 
 ## 結合前に対応（S）— Issue 化して組み込み・HW担当へ
 

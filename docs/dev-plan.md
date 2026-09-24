@@ -150,16 +150,16 @@
 
 - 状態：⬜ 未着手 / 🟡 作業中 / ✅ 完了
 - 推奨モデル：**O** = Opus（設計が必要）、**S** = Sonnet（仕様どおり実装）
-- 担当は §9 Q6 の回答後に記入する
+- 担当：Phase 0〜2 はまず Claude（`aryu` ブランチ）が叩き台を作り、そのあと Phase 1 は田村、Phase 2 は浅井が修正を担当する。Phase 3 の FW は岡田
 
 ### Phase 0：基盤づくり
 
 | ID | タスク | モデル | 状態 | 受け入れ条件 |
 |---|---|---|---|---|
 | T-001 | 開発ルール整備（CLAUDE.md・CONTRIBUTING.md・dev-plan・PRテンプレート） | O | 🟡 | main にマージされ、全員が読める |
-| T-002 | `ren` ブランチのレビューとマージ | O | 🟡 | `docs/reviews/2026-09-24_ren-branch-review.md` の「マージ前に対応」が解消され、main にマージ済み。残りの指摘が Issue になっている |
+| T-002 | `ren` ブランチのレビューとマージ | O | ✅ | PR #2 でマージ済み。残りの指摘は Issue #3〜#6 |
 | T-003 | `docs/api-spec.md` 作成（ingest / device-sync / chat / voice-chat の契約、デバイス認証） | O | ⬜ | 組み込み担当と合意。リクエスト・レスポンスの JSON 例とエラー仕様がある |
-| T-004 | Supabase プロジェクト作成と CLI 初期化（`server/supabase/`） | O | ⬜ | `npx supabase` で migrations・functions を管理でき、手順が CLAUDE.md §8 にある |
+| T-004 | アカウント作成（Supabase・Gemini API キー・Google Cloud の OAuth クライアント・Vercel）と Supabase CLI 初期化（`server/supabase/`） | O | ⬜ | 作成手順が docs にあり、キーは各自の `.env` とSupabaseのシークレットにだけ入っている。`npx supabase` で migrations・functions を管理でき、コマンドが CLAUDE.md §8 にある |
 | T-005 | DBマイグレーション（全テーブル・インデックス・CHECK・RLS・ユーザー初期化トリガー・シード） | O | ⬜ | 空のDBに適用でき、他人のデータが読めないことを確認済み。型を生成できる |
 | T-006 | Next.js 雛形（`app/`）：TS・Tailwind・ESLint・Supabase クライアント・ログイン・共通レイアウト | O | ⬜ | ログイン→ホーム表示→ログアウトができる。`npm run build` が通る。コマンドが CLAUDE.md §8 にある |
 | T-007 | CI（GitHub Actions）：app の lint・型チェック・ビルド、egg の `pio run`、chicken の構文チェック | S | ⬜ | PR ごとに自動実行される |
@@ -209,15 +209,20 @@
 | 2026-08-08 | 鶏ユニットを ESP32 から Raspberry Pi 3B + Python に変更 | ミリ波レーダー（Acconeer A111）の公式対応が Raspberry Pi 向けのため（software-spec ver4） |
 | 2026-08-08 | たまご→鶏の BLE は一方向の Notify、データはバイナリ構造体 | 省電力のため（ble-protocol.md） |
 | 2026-09-24 | 個人ブランチ＋PR（merge commit）で運用。Claude 向けルールは CLAUDE.md、要件・タスクは本書で管理 | チーム開発の開始にあたって |
+| 2026-09-24 | 作業用に分けるブランチ名は `<名前>-<トピック>`（例：`aryu-login-page`） | `aryu` があると Git の仕様で `aryu/〜` を作れないため |
+| 2026-09-24 | メンバーの修正は必ず PR で出し、田村が Claude Code でレビュー・マージする（手順は CLAUDE.md §5-1） | 実機を触れないレビューでも品質を保つため |
+| 2026-09-24 | `ren` ブランチ（たまごFW＋鶏）を PR #2 で main に取り込み、FW の指摘は Issue #3〜#6 にした | レビュー結果（`docs/reviews/2026-09-24_ren-branch-review.md`） |
+| 2026-09-24 | 環境センサー（温湿度・照度）は **鶏** に載せる。たまごの Environment Characteristic は廃止する（Issue #4） | AC給電で電池を気にしなくてよい、布団の中の体温の影響を受けない、たまごの消費電力が減る |
+| 2026-09-24 | 担当：Webアプリ＝田村、バックエンド＝浅井、組み込み＝岡田。まず Claude が全体の叩き台を作り、そのあと担当で分けて修正する | チームの方針 |
 
 ## 9. 未決事項（決まったら決定ログへ移す）
 
 | # | 内容 | 誰が決める |
 |---|---|---|
-| Q1 | 環境センサー（温湿度・照度）をどちらに載せるか。仕様書・開発仕様書は「鶏」、BLE仕様書とたまごFWは「たまご」になっていて、購入は1セットのみ | HW・組み込み |
-| Q2 | 加速度センサー SEN0142 の実体（部品表では MPU-6050＝I2C、たまごFWはアナログ3軸として実装） | HW・組み込み |
+| Q1 | ~~環境センサーの搭載先~~ → 鶏に決定（決定ログ参照） | — |
+| Q2 | 加速度センサー SEN0142 の実体（部品表では MPU-6050＝I2C、たまごFWはアナログ3軸として実装）→ Issue #3 | HW・組み込み |
 | Q3 | 睡眠セッションを始めるきっかけ（アプリの「眠りにつく」か、たまごを巣から取り出したときか） | チーム |
-| Q4 | Supabase・Vercel・Google Cloud（OAuth）のアカウントを誰が作り、誰が管理するか | チーム |
+| Q4 | アカウントはまだ無い（2026-09-24時点）。誰のアカウントで作り、キーを誰が管理するか | チーム |
 | Q5 | 音声認識・合成。Google Cloud STT/TTS は課金アカウントの登録が必要だが、仕様書では「GCPに課金アカウントを紐付けない」方針。Gemini の音声入出力で代替するか | バックエンド |
-| Q6 | Webアプリ・バックエンドの担当分担（SW担当の A：フロント／B：バックエンド・AI） | チーム |
+| Q6 | ~~担当分担~~ → 決定ログ参照 | — |
 | Q7 | 会話音声の保存期間 | バックエンド |
