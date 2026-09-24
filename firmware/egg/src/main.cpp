@@ -8,6 +8,10 @@
 #include "EnvironmentSensor.h"
 #include "DockSensor.h"
 
+#ifdef NERUKOKKO_UPTIME_LOG
+#include "hwtest/UptimeLog.h"  // E5：バッテリーの持ちの測定用（hwtest_battery 環境だけ）
+#endif
+
 namespace {
 BleManager bleManager;
 AudioSensor audioSensor;
@@ -19,6 +23,10 @@ uint32_t lastAudioNotifyMs = 0;
 uint32_t lastMotionPollMs = 0;
 uint32_t lastMotionFallbackMs = 0;
 uint32_t lastEnvNotifyMs = 0;
+
+#ifdef NERUKOKKO_UPTIME_LOG
+UptimeLog uptimeLog;
+#endif
 } // namespace
 
 void setup() {
@@ -29,6 +37,10 @@ void setup() {
     environmentSensor.begin();
     dockSensor.begin();
     bleManager.begin();
+
+#ifdef NERUKOKKO_UPTIME_LOG
+    uptimeLog.begin();
+#endif
 }
 
 void loop() {
@@ -61,4 +73,8 @@ void loop() {
     if (dockSensor.pollEvent(dock)) {
         bleManager.notifyDock(dock);
     }
+
+#ifdef NERUKOKKO_UPTIME_LOG
+    uptimeLog.update(now);
+#endif
 }
