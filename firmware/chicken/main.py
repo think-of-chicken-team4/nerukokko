@@ -21,14 +21,19 @@ egg_state = EggState()
 
 def on_audio(data: AudioLevel) -> None:
     egg_state.update_audio(data)
+    logging.info("Audio: level=%d", data.level)
 
 
 def on_motion(data: MotionEvent) -> None:
     egg_state.update_motion(data)
+    logging.info("Motion: x=%d y=%d z=%d", data.x, data.y, data.z)
 
 
 def on_environment(data: Environment) -> None:
     egg_state.update_environment(data)
+    logging.info(
+        "Environment: temp=%.2f humidity=%.2f lux=%d", data.temperature, data.humidity, data.lux
+    )
 
 
 def on_dock(data: DockEvent) -> None:
