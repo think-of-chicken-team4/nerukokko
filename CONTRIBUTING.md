@@ -107,11 +107,11 @@ GitHub で Pull Request（`<自分の名前>` → `main`）を作ります。
 | ディレクトリ | 内容 | 担当 |
 |---|---|---|
 | `app/` | Webアプリ（Next.js） | 田村 |
-| `server/` | Supabase（DB・Edge Functions） | 浅井 |
-| `firmware/egg/` | たまごFW（ESP32） | 岡田 |
-| `firmware/chicken/` | 鶏ユニット（Raspberry Pi） | 岡田 |
+| `server/` | Supabase（DB・Edge Functions） | 田村 |
+| `firmware/egg/` | たまごFW（ESP32） | 田村（実機検証は岡田） |
+| `firmware/chicken/` | 鶏ユニット（Raspberry Pi） | 田村（実機検証は浅井・岡田） |
 | `docs/` | 仕様書・設計資料 | 全員 |
-| 実機検証（`docs/hw-verification.md`） | たまご・鶏・結合テスト | SW 担当で分担 |
+| 実機検証（`docs/hw-verification.md`） | たまご・鶏・結合テスト | 岡田（たまご中心）・浅井（鶏中心） |
 
 Webアプリ・バックエンド・鶏／たまごのソフトは、まず Claude Code で全体の叩き台を作り、そのあと直す箇所を担当者で分けて修正します。
 

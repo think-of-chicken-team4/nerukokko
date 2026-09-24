@@ -1,0 +1,6 @@
+# 実機検証ツール（hwtest/）で使うパッケージ。本体の requirements.txt に加えて入れる。
+#   pip install -r requirements.txt -r hwtest/requirements.txt
+# LED（WS2812B）の制御。sudo で実行するため、sudo の Python からも使えるように入れること（C6）
+rpi_ws281x>=5.0
+# トサカボタン（Raspberry Pi OS には最初から入っていることが多い）
+gpiozero>=2.0
