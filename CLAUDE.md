@@ -41,12 +41,21 @@
 | `app/` | Webアプリ（スマホ向け） | Next.js App Router / TypeScript | 田村 |
 | `server/supabase/migrations/` | DBスキーマ（SQL） | PostgreSQL | 浅井 |
 | `server/supabase/functions/` | Edge Functions | Deno / TypeScript | 浅井 |
-| `firmware/egg/` | たまごFW | C++ / PlatformIO / NimBLE-Arduino | 組み込み担当（岡田） |
-| `firmware/chicken/` | 鶏ユニット | Python 3 / bleak / acconeer-exptool | 組み込み担当（岡田） |
+| `firmware/egg/` | たまごFW | C++ / PlatformIO / NimBLE-Arduino | 岡田（実機検証は SW 担当で分担） |
+| `firmware/chicken/` | 鶏ユニット | Python 3 / bleak / acconeer-exptool | 岡田（実機検証は SW 担当で分担） |
 | `docs/` | 仕様書・設計資料・レビュー記録 | Markdown | 全員 |
 
-- 当面の進め方：Webアプリとバックエンドは、まず Claude が全体の叩き台（動く完成形）を `aryu` ブランチで作る。その後、直す箇所を担当者で分けて修正する。
+- 当面の進め方：Webアプリ・バックエンド・鶏／たまごのソフトは、まず Claude が全体の叩き台（動く完成形）を作る。その後、直す箇所を担当者で分けて修正する。
 - 担当外ディレクトリの変更は最小限にし、PR本文に「どこを・なぜ変えたか」を書いて担当者にレビューを依頼する。
+
+### 3-1. AI と人の役割分担
+
+- **コードは AI（Claude Code）が書く。実機での検証・調整はソフトウェア担当の人が分担して行う。**
+- 実機検証の一覧と手順は `docs/hw-verification.md`（E1〜E5・C1〜C8・I1〜I4）。
+- Claude は実機を動かせないので、次を守る。
+  - 実機でしか確かめられない動作を「動く」「確認済み」と書かない。PR の「動作確認」には、机上で確認したこと（ビルド・構文チェック・テスト）と、実機で確認が必要なこと（`docs/hw-verification.md` の ID）を分けて書く。
+  - しきい値・ピン番号・送信間隔など、実機で調整する値は、1か所（`PinConfig.h`、`integration_config.py` など）に集め、コメントで「実機で調整する（hw-verification の ID）」と書く。
+  - 検証した人が Issue や PR に残した測定値やログがあれば、それを根拠にコードを直す。推測で値を決めない。
 - **共有の契約**（`docs/api-spec.md`・`docs/ble-protocol.md`・`server/supabase/migrations/`）を変えるときは、影響を受ける側（Web／バックエンド／組み込み）に必ず知らせる。
 
 ## 4. 仕様の優先順位（矛盾したら上が正）
