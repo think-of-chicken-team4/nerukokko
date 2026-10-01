@@ -39,13 +39,15 @@
 | パス | 内容 | 言語・ツール | 担当 |
 |---|---|---|---|
 | `app/` | Webアプリ（スマホ向け） | Next.js App Router / TypeScript | 田村 |
-| `server/supabase/migrations/` | DBスキーマ（SQL） | PostgreSQL | 浅井 |
-| `server/supabase/functions/` | Edge Functions | Deno / TypeScript | 浅井 |
-| `firmware/egg/` | たまごFW | C++ / PlatformIO / NimBLE-Arduino | 岡田（実機検証は SW 担当で分担） |
-| `firmware/chicken/` | 鶏ユニット | Python 3 / bleak / acconeer-exptool | 岡田（実機検証は SW 担当で分担） |
+| `server/supabase/migrations/` | DBスキーマ（SQL） | PostgreSQL | 田村 |
+| `server/supabase/functions/` | Edge Functions | Deno / TypeScript | 田村 |
+| `firmware/egg/` | たまごFW | C++ / PlatformIO / NimBLE-Arduino | 田村（実機検証は岡田） |
+| `firmware/chicken/` | 鶏ユニット | Python 3 / bleak / acconeer-exptool | 田村（実機検証は浅井・岡田） |
+| `firmware/*/hwtest/`・`firmware/egg/src/hwtest/` | 実機検証用のテストプログラム | 同上 | 田村（使うのは岡田・浅井） |
 | `docs/` | 仕様書・設計資料・レビュー記録 | Markdown | 全員 |
 
-- 当面の進め方：Webアプリ・バックエンド・鶏／たまごのソフトは、まず Claude が全体の叩き台（動く完成形）を作る。その後、直す箇所を担当者で分けて修正する。
+- ソフトウェア担当は田村・岡田・浅井の3人。**コードは田村が Claude Code で書き、岡田・浅井は実機での検証・調整を担当する**（単体の検証は 2026-10-16 まで。`docs/hw-verification.md`）。
+- 当面の進め方：Webアプリ・バックエンド・鶏／たまごのソフトは、まず Claude が全体の叩き台（動く完成形）を作る。その後、実機検証の結果を反映し、直す箇所を担当者で分けて修正する。
 - 担当外ディレクトリの変更は最小限にし、PR本文に「どこを・なぜ変えたか」を書いて担当者にレビューを依頼する。
 
 ### 3-1. AI と人の役割分担
@@ -130,7 +132,7 @@
 - 共通処理（CORS、認証、Gemini 呼び出し、キャラ設定）は `_shared/` に置く。
 - 入力は必ずバリデーションし、エラーは `{ "error": "..." }` と適切な HTTP ステータスで返す。
 
-**鶏（firmware/chicken/）**：Python 3.11 以上、型ヒントを付ける、出力は `logging` を使う（`print` は使わない）。
+**鶏（firmware/chicken/）**：Python 3.11 以上、型ヒントを付ける、出力は `logging` を使う（`print` は使わない）。ただし `hwtest/` の検証ツールは人が画面で読むためのものなので `print` でよい。
 **たまご（firmware/egg/）**：既存のクラス構成（`XxxSensor` / `BleManager`）とピン定義（`PinConfig.h`）に従う。
 
 **にわとりキャラクターの口調**：明るく親しみやすい。語尾に時々「コケ」を付ける。返答は2〜3文。専門用語を使わず、やさしく励ます。
