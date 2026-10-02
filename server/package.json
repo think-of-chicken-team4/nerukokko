@@ -1,0 +1,14 @@
+{
+  "name": "nerukokko-server",
+  "private": true,
+  "type": "module",
+  "description": "ねるコッコ バックエンド（Supabase）の開発用スクリプト",
+  "scripts": {
+    "test:db": "node tests/db/schema.test.mjs",
+    "supabase": "supabase"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "supabase": "^2.117.0"
+  }
+}

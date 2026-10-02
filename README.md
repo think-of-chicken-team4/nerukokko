@@ -101,16 +101,16 @@
 ```
 nerukokko/
 ├── README.md
+├── CONTRIBUTING.md        # チーム開発ルール（ブランチ・コミット・PR）
+├── CLAUDE.md              # Claude Code 向けの開発ガイド
 ├── docs/                  # 仕様書・設計資料
 │   ├── full-spec.md       # 完全仕様書
 │   ├── software-spec.md   # ソフトウェア仕様書（DB設計・データフロー・フローチャート）
-│   ├── design-review.pptx # 創造設計デザインレビュー資料（予算・スケジュール・担当分担）
-│   ├── parts-sourcing.xlsx # 部品購入リスト
-│   ├── api-spec.md        # フロント⇔サーバー API仕様（作成予定）
 │   ├── ble-protocol.md    # 鶏⇔たまご BLE仕様
-│   └── flowcharts/        # 動作フロー図（drawio、編集可能）
-│       ├── flow_overview.drawio
-│       └── wake_sequence.drawio
+│   ├── api-spec.md        # 鶏・Webアプリ⇔サーバー API仕様
+│   ├── hw-verification.md # 実機検証・調整の一覧と手順
+│   ├── dev-plan.md        # ソフトウェアの開発計画（要件・タスク・決定ログ）
+│   └── reviews/           # PR レビューの記録
 ├── app/                   # スマホ/Webアプリ（Next.js）
 ├── server/                # バックエンド（Supabase Edge Functions）
 └── firmware/
@@ -120,25 +120,34 @@ nerukokko/
 
 ## ドキュメント
 
-- 完全仕様書：製品コンセプト・ハードウェア構成・ソフトウェア構成の全体像
-- ソフトウェア仕様書：DBスキーマ、データフロー図、フローチャート（1日の状態遷移／起床・二度寝防止シーケンス／音声対話フロー）
-- 創造設計デザインレビュー資料（pptx）：予算、開発スケジュール（ガントチャート）、担当分担
-- 部品購入リスト（xlsx）：検索キーワード付き購入予定リスト
-- BLE仕様書：鶏⇔たまご間のGATT Characteristic構成・データフォーマット
-- 動作フロー図（drawio、編集可能）：全体フロー図・起床シーケンス図
+- [完全仕様書](docs/full-spec.md)：製品コンセプト・ハードウェア構成・ソフトウェア構成の全体像
+- [ソフトウェア仕様書](docs/software-spec.md)：DBスキーマ、データフロー図、フローチャート（1日の状態遷移／起床・二度寝防止シーケンス／音声対話フロー）
+- [BLE仕様書](docs/ble-protocol.md)：鶏⇔たまご間のGATT Characteristic構成・データフォーマット
+- [開発計画書](docs/dev-plan.md)：ソフトウェアの要件、画面仕様、タスク一覧、決定ログ、未決事項
+- [API仕様書](docs/api-spec.md)：鶏・Webアプリとサーバーの通信の決まり
+- [実機検証の一覧](docs/hw-verification.md)：実機での検証・調整の項目と手順（ソフトウェア担当で分担）
 
-各資料は `docs/` 配下にアップロードし、参照リンクをこの表に追加してください。
+創造設計デザインレビュー資料（予算・ガントチャート・担当分担）、部品購入リスト、動作フロー図（drawio）の原本は、リポジトリの外（チームの共有フォルダ）で管理しています。このリポジトリは公開されているため、学校の資料や個人情報を含むファイルはアップロードしないでください。
 
 ## 開発の進め方
 
-- `main` ブランチは保護されており、直接pushはできません。変更は必ずブランチを切ってPull Requestを作成し、レビュー承認後にマージしてください
-- タスク管理はGitHub Projects（カンバンボード）＋ Issueで行います。ラベルは `frontend` `backend` `firmware` を使用します
+**作業を始める前に [CONTRIBUTING.md](CONTRIBUTING.md) を必ず読んでください。** 要点は次のとおりです。
+
+- `main` ブランチは保護されていて、直接 push できません。各自の個人ブランチ（例：`aryu`、`ren`）で作業し、Pull Request で `main` に入れます
+- 作業を始める前に `git pull` と `git merge origin/main` で最新にします
+- コミットメッセージは `<種類>(<範囲>): <日本語の要約>`（例：`feat(app): 設定画面にアラーム編集フォームを追加`）
+- PR は田村（PM）が Claude Code でレビューしてマージします。FW の PR には、実機で何を確認したかを書いてください
+- APIキー・パスワード・Wi-Fi情報は絶対にコミットしないでください（このリポジトリは公開されています）
+- タスク管理は [開発計画書](docs/dev-plan.md) と GitHub Issue で行います。ラベルは `frontend` `backend` `firmware` を使います
 - 開発スケジュールは創造設計デザインレビュー資料のガントチャートを参照してください（4月〜2月、30週間）
+- コードは AI（Claude Code など）に書かせてかまいません。AI には最初に [CLAUDE.md](CLAUDE.md) と [CONTRIBUTING.md](CONTRIBUTING.md) を読ませてください（Claude Code はリポジトリのフォルダで起動すれば自動で読み込みます）
+- 実機での検証・調整は AI にはできないので、ソフトウェア担当で分担します（[実機検証の一覧](docs/hw-verification.md)）
 
 ## メンバー
 
 - リーダー：松島 蓮
 - サブリーダー：内海 圭吾
-- HW担当：松島 蓮、田村 愛琉、浅井 蒼輝
-- SW担当：内海 圭吾、岡田 蓮、渡邉 健太
-  - 組み込み（鶏・たまごFW）：岡田 蓮
+- HW担当：松島 蓮、内海 圭吾、渡邉 健太
+- SW担当：田村 愛琉、岡田 蓮、浅井 蒼輝
+  - ソースコード（Webアプリ・バックエンド・鶏／たまご）：田村 愛琉（Claude Code を使用）
+  - 実機での検証・調整：岡田 蓮（たまご中心）、浅井 蒼輝（鶏中心）
