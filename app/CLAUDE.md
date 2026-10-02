@@ -46,6 +46,7 @@ cd ../server && npm run gen:types
 ## 動作確認
 
 - `npm run lint`・`npx tsc --noEmit`・`npm run build` が通ること。
+- パッケージを追加・更新したら、`npm ci --dry-run` が通ることも確認する（`package-lock.json` が食い違っていると CI の `npm ci` が失敗する）。失敗したら `node_modules` を消して `npm install` し直す。Node.js は 22 以上を使う。
 - 画面を変えたら、`npm run dev` でブラウザから実際に操作して確認する（スマホ幅 390px で見る）。
 - ローカルのテスト用ユーザーは、ログイン画面の「新規登録」で作れる（ローカルではメール確認なし）。
   - 例：名前「テスト」、`tamago@example.com`／`kokekokko123`（ローカルの Supabase にだけ存在するテスト用。`npx supabase db reset` で消えるので、そのときは作り直す）
