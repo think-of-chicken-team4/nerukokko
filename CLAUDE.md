@@ -46,6 +46,7 @@
 | `firmware/*/hwtest/`・`firmware/egg/src/hwtest/` | 実機検証用のテストプログラム | 同上 | 田村（使うのは岡田・浅井） |
 | `docs/` | 仕様書・設計資料・レビュー記録 | Markdown | 全員 |
 
+- Webアプリだけの決まりは `app/CLAUDE.md`、バックエンド（Supabase）だけの決まりは `server/CLAUDE.md` にある。そのフォルダで作業するときは必ず読む。
 - ソフトウェア担当は田村・岡田・浅井の3人。**コードは田村が Claude Code で書き、岡田・浅井は実機での検証・調整を担当する**（単体の検証は 2026-10-16 まで。`docs/hw-verification.md`）。
 - 当面の進め方：Webアプリ・バックエンド・鶏／たまごのソフトは、まず Claude が全体の叩き台（動く完成形）を作る。その後、実機検証の結果を反映し、直す箇所を担当者で分けて修正する。
 - 担当外ディレクトリの変更は最小限にし、PR本文に「どこを・なぜ変えたか」を書いて担当者にレビューを依頼する。
@@ -147,7 +148,9 @@ npx supabase migration new <名前>  # 新しいマイグレーションを作�
 npx supabase start -x imgproxy,logflare,vector,supavisor   # ローカルの Supabase を起動（Docker Desktop が必要。使わない機能は外す）
 npx supabase status               # URL・キー・管理画面（Studio）の URL を表示
 npx supabase db reset             # ローカル DB を作り直してマイグレーションと seed を適用
-npm run gen:types                 # DB の型を app/src/types/database.ts に作り直す（マイグレーションを変えたら必ず）
+npm run gen:types                 # DB の型を作り直す（Webアプリ用と関数用。マイグレーションを変えたら必ず）
+npm run test:functions            # Edge Functions の純粋な部品（スコア計算・データ検証）のテスト
+npx supabase functions serve      # Edge Functions をローカルで動かす。詳しくは server/CLAUDE.md
 npx supabase stop                 # 止める
 
 # --- Webアプリ（app/）。詳しくは app/CLAUDE.md ---
@@ -163,7 +166,7 @@ python3 -m py_compile firmware/chicken/*.py
 cd firmware/egg && pio run
 ```
 
-PR を出すと、GitHub Actions（`.github/workflows/ci.yml`）が Webアプリ・DB・たまご・鶏のチェックを自動で行う。
+PR を出すと、GitHub Actions（`.github/workflows/ci.yml`）が Webアプリ・バックエンド（DB・関数）・たまご・鶏のチェックを自動で行う。
 
 - マイグレーションを追加・変更したら、`npm run test:db` を通し、必要ならテスト（`server/tests/db/schema.test.mjs`）も追加する。
 - 適用済みのマイグレーションファイルは書き換えず、変更は新しいファイルで行う（本番 DB と履歴がずれるため）。
