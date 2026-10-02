@@ -9,6 +9,11 @@ constexpr uint32_t AUDIO_SAMPLE_RATE_HZ = 16000;
 constexpr uint32_t AUDIO_NOTIFY_INTERVAL_MS = 300; // 0.2〜0.5秒ごと
 
 // --- Accelerometer (SEN0142 = MPU-6050, I2C。ピン: VIN/GND/SDA/SCL/INT、AD0未配線のためアドレスは既定の0x68) ---
+// ACCEL_X/Y/Z_PINはアナログ3軸だった頃の名残。本番コード(MotionSensor.cpp)はI2Cのみを使うが、
+// hwtest/accel_test.cppのアナログフォールバック用に残している。
+constexpr int ACCEL_X_PIN = 34;
+constexpr int ACCEL_Y_PIN = 35;
+constexpr int ACCEL_Z_PIN = 36;
 constexpr uint32_t MOTION_POLL_INTERVAL_MS = 100;     // 閾値監視の周期
 constexpr uint32_t MOTION_FALLBACK_INTERVAL_MS = 5000; // 保険の定期送信
 // 前回値との差分がこれを超えたらイベント送信。
