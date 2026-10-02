@@ -1,4 +1,7 @@
+import Link from "next/link";
+
 import { logout } from "@/app/login/actions";
+import { isSimulatorEnabled } from "@/lib/simulator";
 import { createClient } from "@/lib/supabase/server";
 
 // 設定。いまはアカウント情報とログアウトだけ。アラーム・通知・キャラボイスは T-102・T-103 で作る。
@@ -24,6 +27,16 @@ export default async function SettingsPage() {
           </button>
         </form>
       </div>
+
+      {isSimulatorEnabled() && (
+        <div className="card">
+          <h2 className="card-title">🔧 開発用</h2>
+          <p className="muted">実機がなくても、鶏の代わりにデータを送って1日の流れを試せます。</p>
+          <Link href="/dev/simulator" className="btn btn-secondary">
+            デバイスシミュレーターを開く
+          </Link>
+        </div>
+      )}
 
       <div className="card">
         <div className="eyebrow">ABOUT</div>

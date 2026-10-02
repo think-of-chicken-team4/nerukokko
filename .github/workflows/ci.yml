@@ -29,8 +29,8 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm run build
 
-  database:
-    name: DB（マイグレーション・RLS のテスト）
+  backend:
+    name: バックエンド（DB・関数のテストと型チェック）
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -42,8 +42,20 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: server/package-lock.json
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
       - run: npm ci
       - run: npm run test:db
+      - run: npm run test:functions
+      - name: Edge Functions の型チェック
+        run: |
+          for dir in supabase/functions/*/; do
+            name=$(basename "$dir")
+            [ "$name" = "_shared" ] && continue
+            echo "== $name"
+            deno check --config "$dir/deno.json" "$dir/index.ts"
+          done
 
   egg:
     name: たまごFW（本番＋検証用のビルド）
