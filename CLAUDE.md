@@ -144,8 +144,17 @@
 cd server && npm install          # 初回のみ（Supabase CLI と DB テスト用の PGlite が入る）
 npm run test:db                   # マイグレーションを PGlite に適用して制約・RLS・RPC をテスト（Docker 不要）
 npx supabase migration new <名前>  # 新しいマイグレーションを作る（既存のマイグレーションは書き換えない）
-npx supabase start                # ローカルの Supabase 一式を起動（Docker が必要）
+npx supabase start -x imgproxy,logflare,vector,supavisor   # ローカルの Supabase を起動（Docker Desktop が必要。使わない機能は外す）
+npx supabase status               # URL・キー・管理画面（Studio）の URL を表示
 npx supabase db reset             # ローカル DB を作り直してマイグレーションと seed を適用
+npm run gen:types                 # DB の型を app/src/types/database.ts に作り直す（マイグレーションを変えたら必ず）
+npx supabase stop                 # 止める
+
+# --- Webアプリ（app/）。詳しくは app/CLAUDE.md ---
+cd app && npm install
+cp .env.example .env.local        # 値は server/ で npx supabase status を実行して入れる
+npm run dev                       # http://localhost:3000
+npm run lint && npx tsc --noEmit && npm run build
 
 # --- 鶏ユニット（Python）の構文チェック ---
 python3 -m py_compile firmware/chicken/*.py
@@ -154,7 +163,7 @@ python3 -m py_compile firmware/chicken/*.py
 cd firmware/egg && pio run
 ```
 
-Webアプリ（`app/`）のコマンドは雛形を作ったら追記する（`docs/dev-plan.md` の T-006）。
+PR を出すと、GitHub Actions（`.github/workflows/ci.yml`）が Webアプリ・DB・たまご・鶏のチェックを自動で行う。
 
 - マイグレーションを追加・変更したら、`npm run test:db` を通し、必要ならテスト（`server/tests/db/schema.test.mjs`）も追加する。
 - 適用済みのマイグレーションファイルは書き換えず、変更は新しいファイルで行う（本番 DB と履歴がずれるため）。
