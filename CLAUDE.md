@@ -67,9 +67,9 @@
 2. `docs/api-spec.md` — 鶏⇔サーバー、Webアプリ⇔Edge Function の通信契約
 3. `docs/ble-protocol.md` — 鶏⇔たまごの通信契約
 4. `docs/dev-plan.md` — 要件・画面仕様・タスク・決定ログ
-5. `docs/software-spec.md`・`docs/full-spec.md` — 設計時点の仕様書（変更点は dev-plan の決定ログに残す）
+5. `docs/software-spec.md`・`docs/full-spec.md` — 設計時点の仕様書（変更点は dev-plan の決定ログと `docs/spec-changes.md` に残す）
 
-仕様を変えたら、同じPRで該当ドキュメントも更新する。仕様に書かれていないことや矛盾を見つけたら、**推測で埋めずに作業者に質問する**。
+仕様を変えたら、同じPRで該当ドキュメントも更新する。**仕様書（`full-spec.md`・`software-spec.md`・`ble-protocol.md`）と違う実装をしたとき、仕様書に書いていない決まりを足したときは、`docs/spec-changes.md` に1行追加する**（メンバーと共有するため。区分は変更・追加・未決）。仕様に書かれていないことや矛盾を見つけたら、**推測で埋めずに作業者に質問する**。
 
 ## 5. Git・ブランチ運用（Claude は必ず守る）
 
@@ -178,7 +178,7 @@ PR を出すと、GitHub Actions（`.github/workflows/ci.yml`）が Webアプリ
 2. 関連する仕様（§4）を読む。不明点や矛盾があれば、実装を止めて作業者に質問する。
 3. 実装したら、型チェック・lint・ビルドを通し、可能なら画面で動作確認する。
 4. `docs/dev-plan.md` のタスクの状態を更新してコミットする。
-5. 新しく決めたことや仕様の変更は、`docs/dev-plan.md` の「決定ログ」に日付付きで追記する。
+5. 新しく決めたことや仕様の変更は、`docs/dev-plan.md` の「決定ログ」に日付付きで追記する。仕様書と違うこと・仕様書にないことなら、`docs/spec-changes.md` にも追記する。
 6. その日の作業を終えるときは、`docs/dev-plan.md` §0（現在の状況・次にやること・注意点）を更新する。
 
 ## 10. モデルの使い分け（トークン節約）

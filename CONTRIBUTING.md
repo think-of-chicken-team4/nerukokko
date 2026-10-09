@@ -12,6 +12,7 @@
 | `docs/api-spec.md` | 鶏・Webアプリとサーバーの通信の決まり |
 | `docs/ble-protocol.md` | 鶏とたまごの BLE 通信の決まり |
 | `docs/hw-verification.md` | 実機での検証・調整の一覧と手順 |
+| `docs/spec-changes.md` | 仕様書から変えたこと・書き足したこと・未決のことの一覧 |
 
 ## 0. AI と人の役割分担
 
@@ -125,4 +126,4 @@ Webアプリ・バックエンド・鶏／たまごのソフトは、まず Clau
 
 - タスクは `docs/dev-plan.md` のタスク一覧（`T-xxx`）と GitHub Issue で管理する。
 - Issue にはラベル `frontend` / `backend` / `firmware` を付ける。
-- 仕様について決めたことは `docs/dev-plan.md` の「決定ログ」に日付付きで残す。
+- 仕様について決めたことは `docs/dev-plan.md` の「決定ログ」に日付付きで残す。仕様書と違うこと・仕様書にないことを決めたら、`docs/spec-changes.md` にも1行追加する。
