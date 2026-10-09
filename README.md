@@ -58,7 +58,7 @@
    └─ BLE Central（bleakでたまごからのNotify受信）
         ↕ BLE（たまご→鶏の一方向、Notifyのみ）
 [たまごユニット (ESP32 / PlatformIO / NimBLE-Arduino, BLE Peripheral)]
-   ├─ 加速度センサー、PDMマイク（ADA-4346）、温湿度・照度センサー
+   ├─ 加速度センサー、PDMマイク（ADA-4346）
    └─ 充電モジュールのSTATピンでドック検知（起床/就寝）
         ↕ 物理接続（充電）
 [巣（充電ステーション）]
@@ -69,7 +69,7 @@
 - GATT Characteristicは4種類（詳細は `docs/ble-protocol.md` を参照）：
   - **Audio Level**：マイク音量レベル（uint16_t、0.2〜0.5秒ごとNotify）
   - **Motion Event**：加速度x/y/z（int16_t×3、イベント時＋数秒に1回Notify）
-  - **Environment**：温湿度・照度（float×2+uint16_t、30秒〜1分ごとNotify）
+  - **Environment**：温湿度・照度 → **廃止予定**。環境センサーは鶏に載せると決定（Issue #4、`docs/spec-changes.md` X-01）
   - **Dock Event**：起床/就寝検知（uint8_t、充電モジュールSTATピンのエッジ検知時のみNotify）
 - データ形式：JSONではなくバイナリ構造体（struct）をそのままパックする方式
 
@@ -126,6 +126,7 @@ nerukokko/
 - [開発計画書](docs/dev-plan.md)：ソフトウェアの要件、画面仕様、タスク一覧、決定ログ、未決事項
 - [API仕様書](docs/api-spec.md)：鶏・Webアプリとサーバーの通信の決まり
 - [実機検証の一覧](docs/hw-verification.md)：実機での検証・調整の項目と手順（ソフトウェア担当で分担）
+- [仕様書からの変更・追加の記録](docs/spec-changes.md)：実装で仕様書から変えたこと・書き足したこと・未決のこと
 
 創造設計デザインレビュー資料（予算・ガントチャート・担当分担）、部品購入リスト、動作フロー図（drawio）の原本は、リポジトリの外（チームの共有フォルダ）で管理しています。このリポジトリは公開されているため、学校の資料や個人情報を含むファイルはアップロードしないでください。
 
