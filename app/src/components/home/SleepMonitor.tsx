@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 
 import { abortSleep } from "@/app/(main)/actions";
+import { Stat, StatGrid } from "@/components/ui/Stat";
 import { formatTime } from "@/lib/format";
 import type { SleepCounts } from "@/lib/data/sleep";
 import { createClient } from "@/lib/supabase/client";
@@ -62,24 +63,12 @@ export function SleepMonitor({ sessionId, startTime, plannedWakeTime, initial }:
             経過（就寝 {formatTime(startTime)} 〜 起床予定 {formatTime(plannedWakeTime)}）
           </div>
         </div>
-        <div className="stat-grid">
-          <div className="stat">
-            <div className="stat-label">🔄 寝返り</div>
-            <div className="stat-value">{counts.turns}回</div>
-          </div>
-          <div className="stat">
-            <div className="stat-label">😮 いびき・寝言</div>
-            <div className="stat-value">{counts.snores}回</div>
-          </div>
-          <div className="stat">
-            <div className="stat-label">🌡 室温</div>
-            <div className="stat-value">{counts.temperatureC != null ? `${counts.temperatureC.toFixed(1)}℃` : "—"}</div>
-          </div>
-          <div className="stat">
-            <div className="stat-label">💧 湿度</div>
-            <div className="stat-value">{counts.humidityPct != null ? `${Math.round(counts.humidityPct)}%` : "—"}</div>
-          </div>
-        </div>
+        <StatGrid>
+          <Stat label="🔄 寝返り" value={`${counts.turns}回`} />
+          <Stat label="😮 いびき・寝言" value={`${counts.snores}回`} />
+          <Stat label="🌡 室温" value={counts.temperatureC != null ? `${counts.temperatureC.toFixed(1)}℃` : "—"} />
+          <Stat label="💧 湿度" value={counts.humidityPct != null ? `${Math.round(counts.humidityPct)}%` : "—"} />
+        </StatGrid>
       </div>
       <button
         type="button"

@@ -1,6 +1,7 @@
 import { formatTime } from "@/lib/format";
 import { PHASE_LABEL, type Phase } from "@/lib/phase";
 
+import { Clock } from "./Clock";
 import { PhaseDial } from "./PhaseDial";
 
 type Props = {
@@ -23,7 +24,9 @@ export function StatusBar({ phase, chickenOnline }: Props) {
       <PhaseDial phase={phase} />
       <div className="min-w-0 flex-1">
         <div className="font-maru text-sm font-bold">{PHASE_LABEL[phase]}</div>
-        <div className="font-num text-[19px] tracking-wide">{formatTime(new Date())}</div>
+        <div className="font-num text-[19px] tracking-wide">
+          <Clock initial={formatTime(new Date())} />
+        </div>
       </div>
       <div className={`rounded-full px-2.5 py-1 text-[10px] whitespace-nowrap ${badge.className}`}>{badge.text}</div>
     </header>

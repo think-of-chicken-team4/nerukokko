@@ -13,7 +13,9 @@ Next.js は 16 系。書き方に迷ったら、上の AGENTS.md のとおり `n
 | `src/app/login/` | ログイン・新規登録（`actions.ts` が Server Action） |
 | `src/app/(main)/actions.ts` | ホームの Server Action（「眠りにつく」・記録の中止） |
 | `src/app/(main)/dev/simulator/` | デバイスシミュレーター（鶏の代わりに API へデータを送る開発・デモ用） |
-| `src/components/` | 画面をまたいで使う部品（`StatusBar`・`BottomNav`・`PhaseDial`） |
+| `src/components/` | 画面の枠の部品（`StatusBar`・`Clock`・`BottomNav`・`PhaseDial`・`ErrorView`） |
+| `src/components/ui/` | どの画面でも使う部品：`Switch`（ON/OFF）・`SegmentedControl`（今夜／週間などの切り替え、URL で切り替える）・`ChickenBubble`（にわとりのセリフ）・`Stat`/`StatGrid`（数値のタイル）・`ScoreRing`（スコアの円）・`LogItem`（履歴の1行） |
+| `src/app/(main)/loading.tsx`・`error.tsx`、`src/app/error.tsx` | 読み込み中の表示と、エラーのときの表示（「もう一度読み込む」） |
 | `src/components/home/` | ホームの部品（`SleepMonitor`＝睡眠中の即時更新、`SessionWatcher`＝セッションの変化で画面を読み直す、`MorningView`＝朝のスコア） |
 | `src/lib/supabase/` | Supabase クライアント（`client.ts`＝ブラウザ、`server.ts`＝サーバー、`proxy.ts`＝セッション更新） |
 | `src/lib/data/` | DB から読んで判定する処理（今のフェーズ、睡眠中・朝の表示データ、デバイスのオンライン判定） |
@@ -32,8 +34,9 @@ Next.js は 16 系。書き方に迷ったら、上の AGENTS.md のとおり `n
 - 別の端末で起きた変化（鶏からのデータ・起床・スコア確定）で画面を更新したいときは、`SessionWatcher` を置く（変化があると `router.refresh()` でサーバーから読み直す）。
 - ログイン中のユーザー ID は `getUserId()`（`@/lib/supabase/server`）。サーバーでは `getSession()` を使わない。
 - 外部 API（Gemini・カレンダーなど）は Webアプリから直接呼ばず、Edge Function を `supabase.functions.invoke()` で呼ぶ。
-- 見た目は `src/app/globals.css` の部品クラス（`card`・`card-title`・`btn btn-primary`・`stat-grid`・`row`・`pill`・`input`・`hint`・`chat-bubble` など）を使い、プロトタイプ（`資料/nerukokko_prototype.html`）に合わせる。新しい部品が必要なら globals.css に追加する。
-- 色は CSS 変数（`var(--fg)`・`var(--fg-dim)`・`var(--card-bg)`・`var(--inset)`）を使う。時間帯ごとに自動で切り替わる。
+- 見た目はプロトタイプ（`資料/nerukokko_prototype.html`）に合わせる。`src/components/ui/` に部品があるものはそれを使い、なければ `src/app/globals.css` の部品クラス（`card`・`card-title`・`btn btn-primary`・`btn-row`・`row`・`pill pill-gold`・`input`・`hint`・`dev-card-head`・`device-icon` など）を使う。新しい部品が必要なら globals.css にクラスを足し、2画面以上で使うなら `components/ui/` に部品を作る。
+- DB の読み込みでエラーが返ったら、空のデータとして扱わずに `throw` する（`error.tsx` がエラー画面を出す）。データが「ない」場合と「読めなかった」場合を混ぜない。
+- 色は CSS 変数（`var(--fg)`・`var(--fg-dim)`・`var(--card-bg)`・`var(--inset)`・`var(--track)`）を使う。時間帯ごとに自動で切り替わる。朝（`morning`）だけ背景が明るいので、色を足したら朝と夜の両方で読めるか確かめる。
 - 文言は日本語。にわとりのセリフは「〜コケ」の口調。
 - 日時は `src/lib/format.ts` の関数で日本時間にして表示する。
 
