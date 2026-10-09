@@ -335,6 +335,24 @@ body {
     color: #4a2c05;
   }
 
+  /* 曜日の選択ボタン（アラームの編集） */
+  .day-chip {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 1px solid var(--card-border);
+    background: var(--card-bg);
+    color: var(--fg-dim);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .day-chip[aria-pressed="true"] {
+    background: var(--color-gold);
+    border-color: transparent;
+    color: #4a2c05;
+  }
+
   /* デバイスのカードの見出し（アイコン＋名前＋状態） */
   .dev-card-head {
     display: flex;

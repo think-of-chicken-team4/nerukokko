@@ -15,6 +15,7 @@ Next.js は 16 系。書き方に迷ったら、上の AGENTS.md のとおり `n
 | `src/app/(main)/dev/simulator/` | デバイスシミュレーター（鶏の代わりに API へデータを送る開発・デモ用） |
 | `src/components/` | 画面の枠の部品（`StatusBar`・`Clock`・`BottomNav`・`PhaseDial`・`ErrorView`） |
 | `src/components/ui/` | どの画面でも使う部品：`Switch`（ON/OFF）・`SegmentedControl`（今夜／週間などの切り替え、URL で切り替える）・`ChickenBubble`（にわとりのセリフ）・`Stat`/`StatGrid`（数値のタイル）・`ScoreRing`（スコアの円）・`LogItem`（履歴の1行） |
+| `src/components/settings/` | 設定の部品（`AlarmSettings`＝アラームの一覧・編集。保存は `src/app/(main)/settings/actions.ts`） |
 | `src/app/(main)/loading.tsx`・`error.tsx`、`src/app/error.tsx` | 読み込み中の表示と、エラーのときの表示（「もう一度読み込む」） |
 | `src/components/home/` | ホームの部品（`SleepMonitor`＝睡眠中の即時更新、`SessionWatcher`＝セッションの変化で画面を読み直す、`MorningView`＝朝のスコア） |
 | `src/lib/supabase/` | Supabase クライアント（`client.ts`＝ブラウザ、`server.ts`＝サーバー、`proxy.ts`＝セッション更新） |
@@ -22,6 +23,7 @@ Next.js は 16 系。書き方に迷ったら、上の AGENTS.md のとおり `n
 | `src/lib/supabase/realtime.ts` | Realtime の購読（`subscribeAsUser`） |
 | `src/types/score.ts` | スコアの内訳の型（サーバーの `_shared/score.ts` と合わせる） |
 | `src/lib/format.ts` | 日時の表示（すべて日本時間） |
+| `src/lib/alarm.ts` | アラームの曜日の表示（「平日」など）と入力チェック。曜日は 0=日〜6=土、時刻は日本時間 |
 | `src/types/database.ts` | DB の型。**自動生成なので手で編集しない**（作り方は下のコマンド） |
 | `src/proxy.ts` | 全ページの前にセッションを更新し、未ログインならログイン画面へ移動する |
 
