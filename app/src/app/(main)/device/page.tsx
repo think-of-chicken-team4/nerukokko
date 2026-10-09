@@ -29,8 +29,8 @@ export default async function DevicePage() {
     const online = isOnline(device.last_seen);
     return (
       <div key={device.id} className="card">
-        <div className="mb-3 flex items-center gap-3">
-          <div className="flex size-[46px] items-center justify-center rounded-[14px] bg-[var(--inset)] text-2xl">
+        <div className="dev-card-head">
+          <div className="device-icon" aria-hidden>
             {info.icon}
           </div>
           <div>

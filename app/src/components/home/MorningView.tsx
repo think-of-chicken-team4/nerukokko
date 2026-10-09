@@ -1,5 +1,8 @@
 import Link from "next/link";
 
+import { ChickenBubble } from "@/components/ui/ChickenBubble";
+import { ScoreRing } from "@/components/ui/ScoreRing";
+import { Stat, StatGrid } from "@/components/ui/Stat";
 import type { MorningData } from "@/lib/data/sleep";
 import { scoreLabel } from "@/types/score";
 
@@ -29,49 +32,24 @@ export function MorningView({ data }: { data: MorningData }) {
           <p className="muted py-6">スコアを計算しています…</p>
         ) : (
           <>
-            <div
-              className="mx-auto mt-1.5 mb-2.5 flex size-32 items-center justify-center rounded-full"
-              style={{ background: `conic-gradient(var(--color-gold) ${score * 3.6}deg, var(--track) 0deg)` }}
-            >
-              <div className="flex size-24 flex-col items-center justify-center rounded-full bg-[#fffaf2]">
-                <div className="font-num text-[34px] font-bold">{score}</div>
-                <div className="text-[10px] text-[var(--fg-dim)]">/ 100</div>
-              </div>
-            </div>
+            <ScoreRing score={score} />
             <span className="pill pill-gold">{scoreLabel(score)}</span>
           </>
         )}
       </div>
 
       {comment && (
-        <div className="chat-bubble">
-          <div className="text-[22px]" aria-hidden>
-            🐔
-          </div>
-          <div>{comment}</div>
-        </div>
+        <ChickenBubble>{comment}</ChickenBubble>
       )}
 
       <div className="card">
         <h2 className="card-title">🌙 昨夜のサマリー</h2>
-        <div className="stat-grid">
-          <div className="stat">
-            <div className="stat-label">🔄 寝返り</div>
-            <div className="stat-value">{counts.turns}回</div>
-          </div>
-          <div className="stat">
-            <div className="stat-label">😮 いびき・寝言</div>
-            <div className="stat-value">{counts.snores}回</div>
-          </div>
-          <div className="stat">
-            <div className="stat-label">🛏 寝ていた時間</div>
-            <div className="stat-value">{durationText(session.start_time, session.actual_wake_time)}</div>
-          </div>
-          <div className="stat">
-            <div className="stat-label">⏰ 起きるまで</div>
-            <div className="stat-value">{wakeDelayText(session.planned_wake_time, session.actual_wake_time)}</div>
-          </div>
-        </div>
+        <StatGrid>
+          <Stat label="🔄 寝返り" value={`${counts.turns}回`} />
+          <Stat label="😮 いびき・寝言" value={`${counts.snores}回`} />
+          <Stat label="🛏 寝ていた時間" value={durationText(session.start_time, session.actual_wake_time)} />
+          <Stat label="⏰ 起きるまで" value={wakeDelayText(session.planned_wake_time, session.actual_wake_time)} />
+        </StatGrid>
       </div>
 
       <Link href="/records" className="btn btn-secondary">

@@ -4,6 +4,7 @@ import { MorningView } from "@/components/home/MorningView";
 import { SessionWatcher } from "@/components/home/SessionWatcher";
 import { SleepMonitor } from "@/components/home/SleepMonitor";
 import { StartSleepButton } from "@/components/home/StartSleepButton";
+import { ChickenBubble } from "@/components/ui/ChickenBubble";
 import { getCurrentPhase } from "@/lib/data/phase";
 import { getMorningData, getSleepCounts } from "@/lib/data/sleep";
 import { formatDateTime } from "@/lib/format";
@@ -40,8 +41,8 @@ export default async function HomePage() {
     return (
       <>
         <SessionWatcher sessionId={session.id} pollMs={15_000} />
-        <div className="card py-5 text-center">
-          <div className="animate-pulse text-5xl" aria-hidden>
+        <div className="card wake-hero">
+          <div className="wake-hero-eyes" aria-hidden>
             🐔💡
           </div>
           <div className="mt-2 font-maru text-xl font-black">コケコッコー！起床時刻です！</div>
@@ -72,15 +73,10 @@ export default async function HomePage() {
   return (
     <>
       <SessionWatcher userId={userId!} />
-      <div className="chat-bubble">
-        <div className="text-[22px]" aria-hidden>
-          🐔
-        </div>
-        <div>
-          {name && <span className="font-bold">{name}さん、</span>}
-          今日も一日おつかれさまコケ！夜の準備ができたら「眠りにつく」を押してほしいコケ🌙
-        </div>
-      </div>
+      <ChickenBubble>
+        {name && <span className="font-bold">{name}さん、</span>}
+        今日も一日おつかれさまコケ！夜の準備ができたら「眠りにつく」を押してほしいコケ🌙
+      </ChickenBubble>
 
       <div className="card">
         <h2 className="card-title">🌙 今夜の設定</h2>

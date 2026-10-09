@@ -26,23 +26,26 @@ export async function getCurrentPhase(
   supabase: SupabaseClient<Database>,
   now: Date = new Date(),
 ): Promise<CurrentPhase> {
-  const { data: active } = await supabase
+  // 読み込みに失敗したら「夕方」と誤表示せず、エラー画面（error.tsx）を出す
+  const { data: active, error: activeError } = await supabase
     .from("sleep_sessions")
     .select("id, start_time, planned_wake_time")
     .eq("status", "in_progress")
     .maybeSingle();
+  if (activeError) throw new Error(`進行中の睡眠記録を読めませんでした: ${activeError.message}`);
   if (active) {
     const phase = now < new Date(active.planned_wake_time) ? "sleeping" : "wake";
     return { phase, session: active };
   }
 
-  const { data: last } = await supabase
+  const { data: last, error: lastError } = await supabase
     .from("sleep_sessions")
     .select("id, start_time, planned_wake_time, end_time")
     .eq("status", "completed")
     .order("end_time", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (lastError) throw new Error(`直前の睡眠記録を読めませんでした: ${lastError.message}`);
   if (
     last?.end_time &&
     now.getTime() - new Date(last.end_time).getTime() < MORNING_WINDOW_MS &&

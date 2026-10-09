@@ -26,6 +26,9 @@
   --card-border: rgba(255, 255, 255, 0.16);
   --track: rgba(255, 255, 255, 0.18);
   --inset: rgba(0, 0, 0, 0.12);
+  --pill-gold-fg: #ffd28a;
+  --pill-blue-fg: #cfe6f7;
+  --pill-pink-fg: #ffc2cd;
 }
 
 body {
@@ -61,11 +64,24 @@ body {
   --card-border: rgba(74, 54, 36, 0.1);
   --track: rgba(74, 54, 36, 0.14);
   --inset: rgba(74, 54, 36, 0.06);
+  --pill-gold-fg: var(--color-gold-text);
+  --pill-blue-fg: #3d6a8a;
+  --pill-pink-fg: #c14b64;
 }
 
 /* 朝は背景が明るいので、上部のステータスバーを濃くして白い文字を読みやすくする */
 .phase-screen[data-phase="morning"] .status-bar {
   background: rgba(74, 54, 36, 0.45);
+}
+
+@keyframes blink-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
 }
 
 @keyframes wake-flash {
@@ -108,6 +124,7 @@ body {
     color: var(--fg-dim);
     font-weight: 700;
     margin-bottom: 4px;
+    text-transform: uppercase;
   }
   .hint {
     font-size: 11.5px;
@@ -161,6 +178,14 @@ body {
     font-size: 12px;
     border-radius: 12px;
   }
+  /* ボタンを横に並べる（キャラボイスの選択など） */
+  .btn-row {
+    display: flex;
+    gap: 8px;
+  }
+  .btn-row > .btn {
+    margin-top: 0;
+  }
 
   .chat-bubble {
     background: rgba(242, 180, 65, 0.16);
@@ -173,6 +198,10 @@ body {
     gap: 10px;
     align-items: flex-start;
     margin-bottom: 14px;
+  }
+  .chat-avatar {
+    font-size: 22px;
+    flex-shrink: 0;
   }
 
   .stat-grid {
@@ -225,15 +254,15 @@ body {
   }
   .pill-gold {
     background: rgba(242, 180, 65, 0.25);
-    color: var(--color-gold-text);
+    color: var(--pill-gold-fg);
   }
   .pill-blue {
     background: rgba(143, 184, 214, 0.25);
-    color: #3d6a8a;
+    color: var(--pill-blue-fg);
   }
   .pill-pink {
     background: rgba(240, 135, 154, 0.25);
-    color: #c14b64;
+    color: var(--pill-pink-fg);
   }
 
   .input {
@@ -250,9 +279,140 @@ body {
     color: var(--fg-dim);
   }
 
+  /* ON/OFF スイッチ（components/ui/Switch.tsx） */
+  .switch {
+    position: relative;
+    flex-shrink: 0;
+    width: 44px;
+    height: 26px;
+    border: none;
+    border-radius: 20px;
+    background: var(--track);
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .switch::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    transition: left 0.2s;
+  }
+  .switch[aria-checked="true"] {
+    background: var(--color-gold);
+  }
+  .switch[aria-checked="true"]::after {
+    left: 21px;
+  }
+  .switch:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* 表示の切り替え（components/ui/SegmentedControl.tsx） */
+  .seg-ctrl {
+    display: flex;
+    background: var(--inset);
+    border-radius: 14px;
+    padding: 4px;
+    margin-bottom: 14px;
+  }
+  .seg-ctrl > a {
+    flex: 1;
+    text-align: center;
+    padding: 9px;
+    border-radius: 10px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--fg-dim);
+  }
+  .seg-ctrl > a[aria-current="page"] {
+    background: var(--color-gold);
+    color: #4a2c05;
+  }
+
+  /* 曜日の選択ボタン（アラームの編集） */
+  .day-chip {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 1px solid var(--card-border);
+    background: var(--card-bg);
+    color: var(--fg-dim);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .day-chip[aria-pressed="true"] {
+    background: var(--color-gold);
+    border-color: transparent;
+    color: #4a2c05;
+  }
+
+  /* デバイスのカードの見出し（アイコン＋名前＋状態） */
+  .dev-card-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .device-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    background: var(--inset);
+    font-size: 24px;
+  }
+
+  /* イベントや会話の履歴（components/ui/LogItem.tsx） */
+  .log-item {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 0;
+    font-size: 12px;
+    color: var(--fg-dim);
+  }
+  .log-dot {
+    flex-shrink: 0;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-pink);
+  }
+  .log-dot-gold {
+    background: var(--color-gold);
+  }
+
+  /* 起床中の大きな表示 */
+  .wake-hero {
+    text-align: center;
+    padding: 18px 0 6px;
+  }
+  .wake-hero-eyes {
+    font-size: 52px;
+    animation: blink-pulse 1.4s ease-in-out infinite;
+  }
+
   .error-text {
     font-size: 12px;
     color: #ffb3c0;
     margin-top: 8px;
+  }
+}
+
+/* 動きを減らす設定の端末では、点滅・拡大のアニメーションを止める */
+@media (prefers-reduced-motion: reduce) {
+  .phase-screen[data-phase="wake"],
+  .wake-hero-eyes {
+    animation: none;
   }
 }
