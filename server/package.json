@@ -1,0 +1,16 @@
+{
+  "name": "nerukokko-server",
+  "private": true,
+  "type": "module",
+  "description": "ねるコッコ バックエンド（Supabase）の開発用スクリプト",
+  "scripts": {
+    "test:db": "node tests/db/schema.test.mjs",
+    "supabase": "supabase",
+    "gen:types": "supabase gen types typescript --local > ../app/src/types/database.ts && supabase gen types typescript --local > supabase/functions/_shared/database.types.ts",
+    "test:functions": "node --experimental-strip-types --test \"tests/functions/*.test.ts\""
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "supabase": "^2.117.0"
+  }
+}
