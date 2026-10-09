@@ -29,6 +29,7 @@
   --pill-gold-fg: #ffd28a;
   --pill-blue-fg: #cfe6f7;
   --pill-pink-fg: #ffc2cd;
+  --error-fg: #ffb3c0;
 }
 
 body {
@@ -67,6 +68,7 @@ body {
   --pill-gold-fg: var(--color-gold-text);
   --pill-blue-fg: #3d6a8a;
   --pill-pink-fg: #c14b64;
+  --error-fg: #b3344f;
 }
 
 /* 朝は背景が明るいので、上部のステータスバーを濃くして白い文字を読みやすくする */
@@ -247,6 +249,8 @@ body {
 
   .pill {
     display: inline-block;
+    flex-shrink: 0;
+    white-space: nowrap;
     padding: 4px 10px;
     border-radius: 20px;
     font-size: 11px;
@@ -404,7 +408,7 @@ body {
 
   .error-text {
     font-size: 12px;
-    color: #ffb3c0;
+    color: var(--error-fg);
     margin-top: 8px;
   }
 }

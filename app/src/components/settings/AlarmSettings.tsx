@@ -76,7 +76,7 @@ function AlarmRow({ alarm, onEdit }: { alarm: Alarm; onEdit: () => void }) {
         <div className="font-num text-[26px] leading-tight font-bold">{time}</div>
         <div className="row-sub">
           {formatRepeatDays(alarm.repeat_days)}
-          {error && <span className="ml-2 text-[#ffb3c0]">{error}</span>}
+          {error && <span className="ml-2 text-[var(--error-fg)]">{error}</span>}
         </div>
       </button>
       <Switch
