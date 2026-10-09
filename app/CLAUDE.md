@@ -15,11 +15,12 @@ Next.js は 16 系。書き方に迷ったら、上の AGENTS.md のとおり `n
 | `src/app/(main)/dev/simulator/` | デバイスシミュレーター（鶏の代わりに API へデータを送る開発・デモ用） |
 | `src/components/` | 画面の枠の部品（`StatusBar`・`Clock`・`BottomNav`・`PhaseDial`・`ErrorView`） |
 | `src/components/ui/` | どの画面でも使う部品：`Switch`（ON/OFF）・`SegmentedControl`（今夜／週間などの切り替え、URL で切り替える）・`ChickenBubble`（にわとりのセリフ）・`Stat`/`StatGrid`（数値のタイル）・`ScoreRing`（スコアの円）・`LogItem`（履歴の1行） |
+| `src/components/device/` | デバイスの部品（`ChickenRegistration`＝鶏の登録・トークンの再発行・交換。登録は `src/app/(main)/device/actions.ts`） |
 | `src/components/settings/` | 設定の部品（`AlarmSettings`＝アラームの一覧・編集。保存は `src/app/(main)/settings/actions.ts`） |
 | `src/app/(main)/loading.tsx`・`error.tsx`、`src/app/error.tsx` | 読み込み中の表示と、エラーのときの表示（「もう一度読み込む」） |
 | `src/components/home/` | ホームの部品（`SleepMonitor`＝睡眠中の即時更新、`SessionWatcher`＝セッションの変化で画面を読み直す、`MorningView`＝朝のスコア） |
 | `src/lib/supabase/` | Supabase クライアント（`client.ts`＝ブラウザ、`server.ts`＝サーバー、`proxy.ts`＝セッション更新） |
-| `src/lib/data/` | DB から読んで判定する処理（今のフェーズ、睡眠中・朝の表示データ、デバイスのオンライン判定） |
+| `src/lib/data/` | DB から読んで判定する処理（今のフェーズ、睡眠中・朝の表示データ、デバイスのオンライン判定・たまごの場所・MAC アドレスの整形） |
 | `src/lib/supabase/realtime.ts` | Realtime の購読（`subscribeAsUser`） |
 | `src/types/score.ts` | スコアの内訳の型（サーバーの `_shared/score.ts` と合わせる） |
 | `src/lib/format.ts` | 日時の表示（すべて日本時間） |
