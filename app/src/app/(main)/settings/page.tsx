@@ -2,22 +2,26 @@ import Link from "next/link";
 
 import { logout } from "@/app/login/actions";
 import { AlarmSettings } from "@/components/settings/AlarmSettings";
+import { NotificationSettingsCards } from "@/components/settings/NotificationSettings";
 import { formatDateTime } from "@/lib/format";
 import { isSimulatorEnabled } from "@/lib/simulator";
 import { createClient, getUserId } from "@/lib/supabase/server";
 
-// 設定。アラーム（T-102）・アカウント。通知・キャラボイスは T-103 で作る。
+// 設定。アラーム（T-102）・通知とキャラボイス（T-103）・アカウント。カレンダー連携は T-205 で追加する。
 export default async function SettingsPage() {
   const supabase = await createClient();
   const userId = await getUserId();
-  const [profileResult, alarmsResult, nextAlarmResult, activeResult] = await Promise.all([
+  const [profileResult, alarmsResult, nextAlarmResult, activeResult, notificationResult] = await Promise.all([
     supabase.from("users").select("display_name, email").maybeSingle(),
     supabase.from("alarms").select("id, time, repeat_days, enabled").order("time"),
     supabase.rpc("next_alarm_at", { p_user_id: userId! }).maybeSingle(),
     supabase.from("sleep_sessions").select("planned_wake_time").eq("status", "in_progress").maybeSingle(),
+    supabase.from("notification_settings").select("evening_suggestion, morning_score, character_voice").maybeSingle(),
   ]);
   if (alarmsResult.error) throw new Error(`アラームを読めませんでした: ${alarmsResult.error.message}`);
+  if (notificationResult.error) throw new Error(`通知の設定を読めませんでした: ${notificationResult.error.message}`);
   const profile = profileResult.data;
+  const notification = notificationResult.data;
   const nextAlarm = nextAlarmResult.data;
   const active = activeResult.data;
 
@@ -34,6 +38,12 @@ export default async function SettingsPage() {
         )}
         <AlarmSettings alarms={alarmsResult.data} />
       </div>
+
+      {notification && (
+        <NotificationSettingsCards
+          settings={{ ...notification, character_voice: notification.character_voice === "chick" ? "chick" : "rooster" }}
+        />
+      )}
 
       <div className="card">
         <h2 className="card-title">👤 アカウント</h2>
