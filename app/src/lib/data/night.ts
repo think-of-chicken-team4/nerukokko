@@ -15,6 +15,8 @@ export type NightSession = {
   actual_wake_time: string | null;
   status: string;
   score: number | null;
+  /** スコアの内訳。score が null でもこれがあれば「計測できなかった夜」（Q11） */
+  score_details: unknown;
 };
 
 export type NightRecord = {
@@ -77,7 +79,7 @@ function toPoints<R extends { timestamp: string }>(rows: R[], value: (row: R) =>
 export async function getNightRecord(supabase: Client, sessionId: string, now: Date = new Date()): Promise<NightRecord | null> {
   const { data: session, error } = await supabase
     .from("sleep_sessions")
-    .select("id, start_time, end_time, planned_wake_time, actual_wake_time, status, score")
+    .select("id, start_time, end_time, planned_wake_time, actual_wake_time, status, score, score_details")
     .eq("id", sessionId)
     .maybeSingle();
   if (error) throw new Error(`睡眠記録を読めませんでした: ${error.message}`);

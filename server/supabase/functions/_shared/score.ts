@@ -58,9 +58,13 @@ export type ScoreDetails = {
   weights_used: Partial<Record<ComponentKey, number>>;
 };
 
+/**
+ * score・label が null なのは、寝返り・在床・呼吸・環境のどれも計測がなかった夜（鶏がオフラインだった など）。
+ * そのときはスコアを出さず「計測できませんでした」と表示する（dev-plan Q11・T-210）。
+ */
 export type ScoreResult = {
-  score: number;
-  label: string;
+  score: number | null;
+  label: string | null;
   details: ScoreDetails;
 };
 
@@ -190,6 +194,17 @@ export function computeSleepScore(input: ScoreInput): ScoreResult {
     ).length;
     const ratio = inRange / envReadings.length;
     environment = { score: Math.round(ratio * 100), in_range_ratio: round1(ratio), readings: envReadings.length };
+  }
+
+  // 静音度（いびき・寝言の少なさ）だけでは、マイクが動いていたのか分からない（0回＝静か、とも、計測なし、とも取れる）。
+  // ほかの計測が1つもない夜はスコアを出さない（Q11）
+  const measured = efficiency !== null || turnBalance !== null || breathing !== null || environment !== null;
+  if (!measured) {
+    return {
+      score: null,
+      label: null,
+      details: { efficiency, turn_balance: turnBalance, quietness, breathing, environment, weights_used: {} },
+    };
   }
 
   const components: [ComponentKey, number | null][] = [

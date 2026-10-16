@@ -14,6 +14,8 @@ export type WeekNight = {
   end_time: string | null;
   status: string;
   score: number | null;
+  /** スコアの内訳。score が null でもこれがあれば「計測できなかった夜」（Q11） */
+  score_details: unknown;
   turns: number;
   snores: number;
 };
@@ -37,7 +39,7 @@ export async function getWeekRecord(supabase: Client, now: Date = new Date()): P
   const from = new Date(now.getTime() - WEEK_DAYS * DAY_MS);
   const { data: sessions, error } = await supabase
     .from("sleep_sessions")
-    .select("id, start_time, end_time, status, score")
+    .select("id, start_time, end_time, status, score, score_details")
     .gte("start_time", from.toISOString())
     .order("start_time", { ascending: false });
   if (error) throw new Error(`睡眠記録を読めませんでした: ${error.message}`);

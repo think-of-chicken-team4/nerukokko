@@ -130,6 +130,31 @@ describe("computeSleepScore", () => {
   });
 });
 
+describe("computeSleepScore：計測がない夜（Q11）", () => {
+  const empty = { motionTimes: [], audioEventCount: 0, breathsPerMin: [], environment: [], presence: [] };
+
+  it("何も計測がなければ、スコアを出さない（100点にしない）", () => {
+    const result = computeSleepScore(night(empty));
+    assert.equal(result.score, null);
+    assert.equal(result.label, null);
+    assert.deepEqual(result.details.weights_used, {});
+  });
+
+  it("いびき・寝言だけでは、スコアを出さない", () => {
+    assert.equal(computeSleepScore(night({ ...empty, audioEventCount: 3 })).score, null);
+  });
+
+  it("室温・湿度だけでもあれば、静音度と合わせてスコアを出す", () => {
+    const result = computeSleepScore(night({ ...empty, environment: [{ temperatureC: 24, humidityPct: 50 }] }));
+    assert.equal(result.score, 100);
+    assert.deepEqual(Object.keys(result.details.weights_used).sort(), ["environment", "quietness"]);
+  });
+
+  it("呼吸の計測が少なすぎるだけなら、計測なしと同じ", () => {
+    assert.equal(computeSleepScore(night({ ...empty, breathsPerMin: [14, 15] })).score, null);
+  });
+});
+
 describe("scoreLabel", () => {
   it("85点以上・65点以上・それ未満でラベルが変わる", () => {
     assert.equal(scoreLabel(85), "ぐっすり眠れました");

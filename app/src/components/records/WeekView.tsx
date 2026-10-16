@@ -4,6 +4,7 @@ import { ScoreBars } from "@/components/charts/ScoreBars";
 import { Stat, StatGrid } from "@/components/ui/Stat";
 import type { WeekRecord } from "@/lib/data/week";
 import { formatDateTime } from "@/lib/format";
+import { NO_DATA_LABEL, scoreState } from "@/types/score";
 
 const STATUS_LABEL = { in_progress: "記録中", completed: "完了", aborted: "中止" } as const;
 
@@ -37,7 +38,9 @@ export function WeekView({ week }: { week: WeekRecord }) {
                 <div className="row-sub">
                   {night.status === "aborted"
                     ? STATUS_LABEL.aborted
-                    : `寝返り ${night.turns}回・いびき ${night.snores}回`}
+                    : scoreState(night.score, night.score_details) === "no_data"
+                      ? NO_DATA_LABEL
+                      : `寝返り ${night.turns}回・いびき ${night.snores}回`}
                 </div>
               </div>
               <div className="font-num text-lg font-bold">

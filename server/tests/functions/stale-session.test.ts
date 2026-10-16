@@ -45,3 +45,28 @@ describe("morningComment（起床を検知できなかったとき）", () => {
     assert.ok(comment.includes("巣に戻してほしい"));
   });
 });
+
+describe("morningComment（計測がなかった夜）", () => {
+  const start = new Date("2026-10-15T14:00:00Z");
+  const empty = computeSleepScore({
+    startTime: start,
+    endTime: new Date(start.getTime() + 8 * 60 * 60 * 1000),
+    motionTimes: [],
+    audioEventCount: 0,
+    breathsPerMin: [],
+    environment: [],
+    presence: [],
+  });
+
+  it("スコアの代わりに、機器を確かめてほしいと伝える", () => {
+    const comment = morningComment(empty, "テスト");
+    assert.ok(comment.startsWith("テストさん、おはようコケ！"));
+    assert.ok(comment.includes("スコアは出せなかった"));
+    assert.ok(!comment.includes("null"));
+  });
+
+  it("起床も検知できなかったら、両方を伝える", () => {
+    const comment = morningComment(empty, "", false);
+    assert.ok(comment.includes("スコアは出せなかった") && comment.includes("3時間後"));
+  });
+});

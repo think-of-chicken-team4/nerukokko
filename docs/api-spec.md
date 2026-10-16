@@ -315,6 +315,7 @@ const { data } = await supabase.functions.invoke("chat", {
 ```ts
 await supabase.functions.invoke("morning-summary", { body: { session_id: "…" } });
 // data: { session_id, score, label, details: { efficiency: 88, turn_balance: 90, … }, comment }
+// 睡眠効率・寝返り・呼吸・環境のどれも計測がない夜は score・label が null（dev-plan §6、Q11）
 ```
 
 ### 4-5. `POST evening-suggestion` — 就寝時刻の提案

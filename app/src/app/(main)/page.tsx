@@ -8,6 +8,7 @@ import { getEveningData } from "@/lib/data/evening";
 import { getHomePhase } from "@/lib/data/phase";
 import { getMorningData, getSleepCounts } from "@/lib/data/sleep";
 import { createClient, getUserId } from "@/lib/supabase/server";
+import { scoreState } from "@/types/score";
 
 // ホーム。DB の状態（と「就寝準備へ進む」の cookie）から判定したフェーズに合わせて表示を切り替える（docs/dev-plan.md §5-2）
 export default async function HomePage() {
@@ -64,7 +65,7 @@ export default async function HomePage() {
     if (data) {
       return (
         <>
-          <SessionWatcher sessionId={session.id} userId={userId} pollMs={data.session.score === null ? 5_000 : undefined} />
+          <SessionWatcher sessionId={session.id} userId={userId} pollMs={scoreState(data.session.score, data.session.score_details) === "pending" ? 5_000 : undefined} />
           <MorningView data={data} />
         </>
       );
