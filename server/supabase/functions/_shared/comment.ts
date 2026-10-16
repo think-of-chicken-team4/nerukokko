@@ -9,10 +9,16 @@ import type { ScoreResult } from "./score.ts";
  */
 export function morningComment(result: ScoreResult, displayName: string, wakeDetected = true): string {
   const { score, label, details } = result;
-  const greeting = `${displayName ? `${displayName}さん、` : ""}おはようコケ！昨夜のスコアは${score}点、「${label}」だったコケ。`;
+  const name = displayName ? `${displayName}さん、` : "";
   const notice = wakeDetected
     ? ""
     : "たまごが巣に戻ったのがわからなかったから、起床予定の3時間後までで記録を締めたコケ。朝はたまごを巣に戻してほしいコケ。";
+
+  // 計測がなかった夜（Q11）：スコアの代わりに、機器を確かめてもらう
+  if (score === null) {
+    return `${name}おはようコケ！昨夜は計測のデータが届かなかったから、スコアは出せなかったコケ。${notice}にわとりの電源と Wi-Fi、たまごの充電を確かめてほしいコケ。`;
+  }
+  const greeting = `${name}おはようコケ！昨夜のスコアは${score}点、「${label}」だったコケ。`;
 
   const turns = details.turn_balance?.count ?? 0;
   const latency = details.efficiency?.onset_latency_min ?? 0;

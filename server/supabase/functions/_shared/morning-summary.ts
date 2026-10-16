@@ -7,8 +7,9 @@ import { computeSleepScore, type ScoreDetails } from "./score.ts";
 
 export type MorningSummary = {
   session_id: string;
-  score: number;
-  label: string;
+  /** 計測がなかった夜は null（Q11） */
+  score: number | null;
+  label: string | null;
   details: ScoreDetails;
   comment: string;
 };

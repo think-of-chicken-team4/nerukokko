@@ -3,7 +3,7 @@ import { LineChart } from "@/components/charts/LineChart";
 import { LogItem } from "@/components/ui/LogItem";
 import type { NightRecord, Point } from "@/lib/data/night";
 import { formatDateTime, formatTime } from "@/lib/format";
-import { scoreLabel } from "@/types/score";
+import { NO_DATA_LABEL, scoreLabel, scoreState } from "@/types/score";
 
 const STATUS = {
   in_progress: { label: "記録中", pill: "pill-blue" },
@@ -65,6 +65,9 @@ export function NightRecordView({ record }: { record: NightRecord }) {
             <span className="font-num text-[28px] font-bold">{session.score}</span>
             <span className="muted">点・{scoreLabel(session.score)}</span>
           </div>
+        )}
+        {scoreState(session.score, session.score_details) === "no_data" && (
+          <p className="muted mt-2">スコア：{NO_DATA_LABEL}（計測のデータが届かなかった夜）</p>
         )}
       </div>
 
