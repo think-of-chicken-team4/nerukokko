@@ -325,8 +325,10 @@ await supabase.functions.invoke("morning-summary", { body: { session_id: "…" }
 
 ### 4-5. `POST evening-suggestion` — 就寝時刻の提案
 
-- 毎日19:00（日本時間）に、サーバーの定期実行が secret キーで呼び、全ユーザーぶん作る。
-- Webアプリから呼ぶと、ログイン中のユーザーの分だけ作り直す（デモ用）。
+- 毎日19:00（日本時間）に、サーバーの定期実行が secret キーで呼び、全ユーザーぶん作る（応答は `{ created, skipped, failed }`）。
+- Webアプリから呼ぶと、ログイン中のユーザーの分だけ作り直す（デモ用。デバイスシミュレーターにボタンあり）。
+- 計算：起きる時刻＝24時間以内の次のアラーム（なければ作らず `recommendation: null`）。推奨就寝時刻＝起きる時刻 − 7時間半 − 寝つくまでの時間（直近7晩の平均、10〜60分。記録がなければ15分）。理由文は Gemini（使えなければ定型文）。カレンダーの予定（`first_event_*`）は T-205 で足す。
+- 起きる日（`target_date`）ごとに1件。作り直すと上書きする。
 
 ```ts
 const { data } = await supabase.functions.invoke("evening-suggestion", { body: {} });
