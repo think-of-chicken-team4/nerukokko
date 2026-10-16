@@ -210,7 +210,7 @@ DEVICE_TOKEN=（登録時に表示された値）
 | 項目 | 説明 |
 |---|---|
 | `alarm` | 次に鳴らす時刻。進行中のセッションがあればその `planned_wake_time`（`source: "session"`）、なければ有効なアラームのうち次に来る時刻（`source: "alarm"`、7日以内）。どちらもなければ `null` |
-| `session` | 進行中の睡眠セッション。なければ `null` |
+| `session` | 進行中の睡眠セッション。なければ `null`（起床予定から3時間たっても巣に戻らなかった記録は、このときに締められて `null` になる。§5） |
 | `settings.character_voice` | `rooster`（にわとり）または `chick`（ひよこ） |
 
 **鶏の動作**
@@ -340,6 +340,7 @@ const { data } = await supabase.functions.invoke("evening-suggestion", { body: {
 ## 5. サーバー内部の処理
 
 - **起床〜朝の振り返り**：`ingest-sensor-data` が `charge_start` を受ける → セッションを完了 → `morning-summary` をバックグラウンドで実行 → スコア（`sleep_sessions.score`・`score_details`）とにわとりのコメント（`chat_sessions.trigger = 'scheduled_morning'`）を保存 → Realtime で Webアプリに反映。
+- **巣に戻らないまま残った記録**：Supabase Cron が10分ごとに `close-stale-sessions`（secret キー）を呼ぶ。起床予定から3時間たっても進行中の記録を、`end_time` = 起床予定＋3時間・`status = completed` にして（`actual_wake_time` は入れない＝起床を検知できなかった印）、朝の振り返りを作る。`device-sync` を受けたときも、そのユーザーの分を同じように締める（定期実行の予備）。あとから `charge_start` が届いても、完了した記録は変えない。
 - **夕方の提案**：Supabase Cron が毎日 10:00 UTC（＝19:00 日本時間）に `evening-suggestion` を呼ぶ。
 - スコアの計算方法は `docs/dev-plan.md` §6。
 

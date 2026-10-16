@@ -54,8 +54,33 @@ npm run test:db          # DB のテスト
 npm run test:functions   # _shared の純粋な関数のテスト
 npm run gen:types        # DB の型を作り直す（Webアプリ用と関数用の両方）
 npx supabase functions serve   # 関数をローカルで動かす（http://127.0.0.1:54321/functions/v1/<関数名>）
-deno check --config supabase/functions/<関数名>/deno.json supabase/functions/<関数名>/index.ts   # 型チェック（Deno が必要。CI でも実行される）
+deno check --config supabase/functions/<関数名>/deno.json supabase/functions/<関数名>/index.ts   # 型チェック（CI でも実行される）
+# Deno が入っていなければ `npx --yes deno@2 check ...` でもよい。各関数の deno.lock（依存の版の記録）はコミットする。
+# functions serve の最中に deno check をすると、書きかけの deno.lock を読んで関数が一度だけ起動エラー（503）になることがある。もう一度呼べば直る
 ```
+
+## 定期実行（Supabase Cron）
+
+関数を決まった時刻に動かすときは、マイグレーションで `cron.schedule()` を作り、`net.http_post()`（pg_net）で関数を secret キー付きで呼ぶ（例：`migrations/20261016020912_schedule_close_stale_sessions.sql`）。
+
+- 呼び先の URL と secret キーは**リポジトリに書かず**、DB の Vault に入れる。ジョブは、どちらかがなければ何もしない。
+- pg_cron・pg_net がない環境（DB のテストに使う PGlite）では、ジョブを作らずに飛ばすように書く（`pg_available_extensions` で確かめる）。
+
+| ジョブ | 間隔 | 関数 |
+|---|---|---|
+| `close-stale-sessions` | 10分ごと | 巣に戻らないまま起床予定から3時間たった記録を締めて採点する（T-209） |
+
+**Vault の設定（環境ごとに1回。`npx supabase db reset` をしたらやり直す）**
+
+ローカル：Studio（http://127.0.0.1:54323）の SQL Editor で実行する。secret キーは `npx supabase status` の `SECRET_KEY`。
+
+```sql
+select vault.create_secret('http://host.docker.internal:54321', 'project_url');
+select vault.create_secret('<SECRET_KEY の値>', 'secret_key');
+```
+
+本番：Supabase のダッシュボードの SQL Editor で、`project_url` に `https://<プロジェクト>.supabase.co`、`secret_key` に本番の secret キーを入れる（公開の手順 T-004 で行う）。
+動いたかは `select * from cron.job_run_details order by start_time desc limit 5;` と `select status_code, content from net._http_response order by created desc limit 5;` で確かめる。
 
 ## 動作確認
 
