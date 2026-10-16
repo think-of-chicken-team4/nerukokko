@@ -3,15 +3,17 @@
     python3 -m eyes.eye_display                          # 全画面（ラズパイの DSI 用）
     python3 -m eyes.eye_display --windowed               # PC でウィンドウ表示
     python3 -m eyes.eye_display --expression sleepy      # 最初の表情を指定
+    python3 -m eyes.eye_display --darkness 0.0           # 昼の配色（0.0=昼、1.0=夜）
     python3 -m eyes.eye_display --save-frames out/       # 画面なしで表情ごとの PNG を保存して確認
 
-キー：1=通常 2=眠い 3=うれしい 4=起こす、Esc か Q で終了。
+キー：1=通常 2=眠い 3=うれしい 4=起こす、5=昼 6=夜 7=時刻で自動、Esc か Q で終了。
 実機で調整する値（色・大きさ・位置）は下の定数にまとめている（Issue #28）。
 """
 
 from __future__ import annotations
 
 import argparse
+import datetime
 import logging
 import os
 import time
@@ -19,16 +21,21 @@ from pathlib import Path
 
 import pygame
 
-from .eye_state import EXPRESSIONS, EyeFrame, EyeState, Expression
+from .eye_state import EXPRESSIONS, DarknessEstimator, EyeFrame, EyeState, Expression
 
 logger = logging.getLogger(__name__)
 
 # 実機で調整する値
 SCREEN_SIZE = (800, 480)  # 5インチ DSI ディスプレイ
 FPS = 60
-BACKGROUND = (16, 20, 24)  # 夜でもまぶしくない暗い背景
-EYE_COLOR = (240, 236, 224)
-PUPIL_COLOR = (20, 24, 28)
+# 夜の配色：暗い背景に明るい目（寝室でまぶしくない）
+NIGHT_BACKGROUND = (16, 20, 24)
+NIGHT_EYE = (240, 236, 224)
+NIGHT_PUPIL = (20, 24, 28)
+# 昼の配色：明るい背景に暗い目（鶏の顔らしい）
+DAY_BACKGROUND = (255, 243, 210)
+DAY_EYE = (34, 30, 28)
+DAY_PUPIL = (70, 58, 52)
 HIGHLIGHT_COLOR = (255, 255, 255)
 EYE_WIDTH_RATIO = 0.22  # 画面の幅に対する目の幅
 EYE_HEIGHT_RATIO = 0.55  # 画面の高さに対する目の高さ（開いているとき）
@@ -40,6 +47,27 @@ SMILE_CUT_SHIFT = 0.22  # 笑い目：下から切り取る楕円を、目の高
 SMILE_RECENTER = 0.2  # 笑い目のとき、目全体を下げる量（目の高さに対する割合）
 SMILE_HIDE_PUPIL = 0.25  # 笑いがこの値を超えたら瞳を描かない
 
+Color = tuple[int, int, int]
+
+
+class Palette:
+    """暗さ（0.0=昼、1.0=夜）から混ぜた配色。"""
+
+    def __init__(self, darkness: float) -> None:
+        self.background = _mix(DAY_BACKGROUND, NIGHT_BACKGROUND, darkness)
+        self.eye = _mix(DAY_EYE, NIGHT_EYE, darkness)
+        self.pupil = _mix(DAY_PUPIL, NIGHT_PUPIL, darkness)
+
+
+def _mix(day: Color, night: Color, darkness: float) -> Color:
+    d = min(1.0, max(0.0, darkness))
+    return (
+        int(day[0] + (night[0] - day[0]) * d),
+        int(day[1] + (night[1] - day[1]) * d),
+        int(day[2] + (night[2] - day[2]) * d),
+    )
+
+
 KEY_TO_EXPRESSION = {
     pygame.K_1: Expression.NORMAL,
     pygame.K_2: Expression.SLEEPY,
@@ -48,9 +76,10 @@ KEY_TO_EXPRESSION = {
 }
 
 
-def draw_eyes(surface: pygame.Surface, frame: EyeFrame) -> None:
+def draw_eyes(surface: pygame.Surface, frame: EyeFrame, darkness: float = 1.0) -> None:
+    palette = Palette(darkness)
     width, height = surface.get_size()
-    surface.fill(BACKGROUND)
+    surface.fill(palette.background)
     eye_w = int(width * EYE_WIDTH_RATIO * frame.scale)
     full_h = int(height * EYE_HEIGHT_RATIO * frame.scale)
     eye_h = max(MIN_VISIBLE_HEIGHT, int(full_h * frame.openness))
@@ -58,28 +87,29 @@ def draw_eyes(surface: pygame.Surface, frame: EyeFrame) -> None:
     gap = int(width * EYE_GAP_RATIO)
     for sign in (-1, 1):
         center_x = width // 2 + sign * gap
-        _draw_one_eye(surface, center_x, center_y, eye_w, eye_h, full_h, frame)
+        _draw_one_eye(surface, center_x, center_y, eye_w, eye_h, full_h, frame, palette)
 
 
 def _draw_one_eye(
-    surface: pygame.Surface, cx: int, cy: int, w: int, h: int, full_h: int, frame: EyeFrame
+    surface: pygame.Surface, cx: int, cy: int, w: int, h: int, full_h: int, frame: EyeFrame, palette: Palette
 ) -> None:
     rect = pygame.Rect(0, 0, w, h)
     rect.center = (cx, cy)
-    pygame.draw.ellipse(surface, EYE_COLOR, rect)
+    pygame.draw.ellipse(surface, palette.eye, rect)
     if h >= full_h * 0.35 and frame.smile < SMILE_HIDE_PUPIL:
-        _draw_pupil(surface, rect, cx, cy, w, full_h, frame)
+        _draw_pupil(surface, rect, cx, cy, w, full_h, frame, palette)
     if frame.smile > 0.01:
         cut = rect.copy()
         cut.centery = rect.centery + int(h * SMILE_CUT_SHIFT * frame.smile)
-        pygame.draw.ellipse(surface, BACKGROUND, cut)  # 下を丸く切り取って笑い目（三日月）にする
+        pygame.draw.ellipse(surface, palette.background, cut)  # 下を丸く切り取って笑い目（三日月）にする
     if frame.lid > 0.01:
         lid = pygame.Rect(rect.left - 2, rect.top - 2, rect.width + 4, int(h * frame.lid) + 2)
-        pygame.draw.rect(surface, BACKGROUND, lid)  # 上まぶた（眠いとき）
+        pygame.draw.rect(surface, palette.background, lid)  # 上まぶた（眠いとき）
 
 
 def _draw_pupil(
-    surface: pygame.Surface, rect: pygame.Rect, cx: int, cy: int, w: int, full_h: int, frame: EyeFrame
+    surface: pygame.Surface, rect: pygame.Rect, cx: int, cy: int, w: int, full_h: int, frame: EyeFrame,
+    palette: Palette,
 ) -> None:
     pupil_r = int(min(w, full_h) * 0.30 * frame.pupil)
     offset_x = int(frame.gaze_x * frame.gaze_range * w * GAZE_MAX_OFFSET)
@@ -87,12 +117,12 @@ def _draw_pupil(
     px, py = cx + offset_x, cy + offset_y
     clip_before = surface.get_clip()
     surface.set_clip(rect)  # まぶたの外には瞳をはみ出させない
-    pygame.draw.circle(surface, PUPIL_COLOR, (px, py), pupil_r)
+    pygame.draw.circle(surface, palette.pupil, (px, py), pupil_r)
     pygame.draw.circle(surface, HIGHLIGHT_COLOR, (px - pupil_r // 3, py - pupil_r // 3), max(3, pupil_r // 5))
     surface.set_clip(clip_before)
 
 
-def run(windowed: bool, expression: Expression) -> None:
+def run(windowed: bool, expression: Expression, darkness: float | None) -> None:
     pygame.init()
     flags = 0 if windowed else pygame.FULLSCREEN
     screen = pygame.display.set_mode(SCREEN_SIZE, flags)
@@ -101,6 +131,8 @@ def run(windowed: bool, expression: Expression) -> None:
     clock = pygame.time.Clock()
     state = EyeState(time.monotonic())
     state.set_expression(expression)
+    ambient = DarknessEstimator(initial=1.0 if darkness is None else darkness)
+    auto = darkness is None  # --darkness 指定なしなら、時刻で自動
     running = True
     while running:
         for event in pygame.event.get():
@@ -111,14 +143,25 @@ def run(windowed: bool, expression: Expression) -> None:
                     running = False
                 elif event.key in KEY_TO_EXPRESSION:
                     state.set_expression(KEY_TO_EXPRESSION[event.key])
-        draw_eyes(screen, state.update(time.monotonic()))
+                elif event.key == pygame.K_5:
+                    auto = False
+                    ambient.force(0.0)
+                elif event.key == pygame.K_6:
+                    auto = False
+                    ambient.force(1.0)
+                elif event.key == pygame.K_7:
+                    auto = True
+        now = time.monotonic()
+        if auto:
+            ambient.update(now, hour=datetime.datetime.now().hour)  # 照度センサーの値は、連携時に lux= で渡す
+        draw_eyes(screen, state.update(now), ambient.value)
         pygame.display.flip()
         clock.tick(FPS)
     pygame.quit()
 
 
 def save_frames(directory: Path) -> None:
-    """画面なし（dummy ドライバ）で、表情ごとの静止画（まばたきなし）を PNG に保存する。確認用。"""
+    """画面なし（dummy ドライバ）で、表情×昼夜の静止画（まばたきなし）を PNG に保存する。確認用。"""
     os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
     pygame.init()
     surface = pygame.Surface(SCREEN_SIZE)
@@ -128,8 +171,9 @@ def save_frames(directory: Path) -> None:
             openness=1.0, gaze_x=0.0, gaze_y=0.0, lid=params.lid, smile=params.smile,
             scale=params.scale, pupil=params.pupil, gaze_range=params.gaze_range,
         )
-        draw_eyes(surface, frame)
-        pygame.image.save(surface, str(directory / f"{expression.value}.png"))
+        for name, darkness in (("day", 0.0), ("night", 1.0)):
+            draw_eyes(surface, frame, darkness)
+            pygame.image.save(surface, str(directory / f"{expression.value}_{name}.png"))
     logger.info("表情ごとの PNG を保存しました：%s", directory)
     pygame.quit()
 
@@ -139,12 +183,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="目の表示（試作）")
     parser.add_argument("--windowed", action="store_true", help="全画面でなくウィンドウで表示する")
     parser.add_argument("--expression", choices=[e.value for e in Expression], default="normal")
+    parser.add_argument("--darkness", type=float, help="暗さ 0.0=昼 〜 1.0=夜（指定すると固定。なければ時刻で自動）")
     parser.add_argument("--save-frames", type=Path, help="画面なしで PNG を保存するフォルダ（確認用）")
     args = parser.parse_args()
     if args.save_frames:
         save_frames(args.save_frames)
     else:
-        run(args.windowed, Expression(args.expression))
+        run(args.windowed, Expression(args.expression), args.darkness)
 
 
 if __name__ == "__main__":

@@ -48,6 +48,13 @@ GAZE_SMOOTHING_PER_SEC = 6.0
 EXPRESSION_SMOOTHING_PER_SEC = 7.0  # 表情が切り替わる速さ
 PULSE_HZ = 1.6
 
+# 昼夜の切り替え（実機で測って決める値。照度の閾値は hw-verification C3 の結果と合わせる）
+LUX_DARK_BELOW = 10.0  # この照度（lux）を下回ったら「暗い」
+LUX_BRIGHT_ABOVE = 30.0  # この照度を上回ったら「明るい」（暗い閾値との間はヒステリシス）
+NIGHT_START_HOUR = 22  # 照度がないときは時刻で決める（22時〜翌6時が夜）
+NIGHT_END_HOUR = 6
+DARKNESS_SMOOTHING_PER_SEC = 0.5  # 切り替えの速さ（小さいほどゆっくり。約数秒かけて変わる）
+
 
 @dataclass(frozen=True)
 class EyeFrame:
@@ -159,3 +166,35 @@ def _values(params: ExpressionParams) -> tuple[float, ...]:
 def _smoothstep(t: float) -> float:
     t = min(1.0, max(0.0, t))
     return t * t * (3.0 - 2.0 * t)
+
+
+class DarknessEstimator:
+    """部屋の暗さ（0.0=明るい、1.0=暗い）を、照度または時刻から決める。
+
+    照度があれば照度を優先し、なければ時刻で決める。照度の判定にはヒステリシスを持たせ、
+    出力はゆっくり近づける（急に明るさが変わって目がちらつかないように）。
+    """
+
+    def __init__(self, initial: float = 1.0) -> None:
+        self.value = initial
+        self._dark = initial >= 0.5
+        self._last_update: float | None = None
+
+    def update(self, now: float, lux: float | None = None, hour: int | None = None) -> float:
+        dt = 0.0 if self._last_update is None else max(0.0, now - self._last_update)
+        self._last_update = now
+        if lux is not None:
+            if self._dark and lux > LUX_BRIGHT_ABOVE:
+                self._dark = False
+            elif not self._dark and lux < LUX_DARK_BELOW:
+                self._dark = True
+        elif hour is not None:
+            self._dark = hour >= NIGHT_START_HOUR or hour < NIGHT_END_HOUR
+        target = 1.0 if self._dark else 0.0
+        self.value += (target - self.value) * min(1.0, DARKNESS_SMOOTHING_PER_SEC * dt)
+        return self.value
+
+    def force(self, darkness: float) -> None:
+        """手動で値を決める（確認用）。"""
+        self.value = min(1.0, max(0.0, darkness))
+        self._dark = self.value >= 0.5
