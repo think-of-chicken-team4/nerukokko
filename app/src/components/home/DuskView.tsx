@@ -51,6 +51,9 @@ export function DuskView({ name, data }: { name: string; data: EveningData }) {
         </div>
       </div>
 
+      <Link href="/chat" className="btn btn-secondary">
+        🐔 にわとりと話す
+      </Link>
       <form action={enterPrep}>
         <button type="submit" className="btn btn-primary">
           {recommendation ? "提案どおり、就寝準備へ進む →" : "就寝準備へ進む →"}
