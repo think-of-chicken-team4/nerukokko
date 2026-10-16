@@ -26,6 +26,8 @@ const dateKeyFormatter = new Intl.DateTimeFormat("en-CA", {
   day: "2-digit",
 });
 
+const monthDayFormatter = new Intl.DateTimeFormat("ja-JP", { timeZone: TIME_ZONE, month: "numeric", day: "numeric" });
+
 const hourFormatter = new Intl.DateTimeFormat("en-US", { timeZone: TIME_ZONE, hour: "numeric", hourCycle: "h23" });
 
 /** 例：07:30 */
@@ -46,4 +48,9 @@ export function jstHour(value: Date): number {
 /** 日本時間の日付（例：2026-10-16）。DB の date 型の列と比べるときに使う */
 export function jstDateKey(value: string | Date): string {
   return dateKeyFormatter.format(new Date(value));
+}
+
+/** 例：10/3 */
+export function jstMonthDay(value: Date): string {
+  return monthDayFormatter.format(value);
 }

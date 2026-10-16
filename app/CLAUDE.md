@@ -17,6 +17,8 @@ Next.js は 16 系。書き方に迷ったら、上の AGENTS.md のとおり `n
 | `src/components/ui/` | どの画面でも使う部品：`Switch`（ON/OFF）・`SegmentedControl`（今夜／週間などの切り替え、URL で切り替える）・`ChickenBubble`（にわとりのセリフ）・`Stat`/`StatGrid`（数値のタイル）・`ScoreRing`（スコアの円）・`LogItem`（履歴の1行） |
 | `src/components/device/` | デバイスの部品（`ChickenRegistration`＝鶏の登録・トークンの再発行・交換。登録は `src/app/(main)/device/actions.ts`） |
 | `src/components/settings/` | 設定の部品（`AlarmSettings`＝アラームの一覧・編集、`NotificationSettings`＝通知の ON/OFF とキャラボイス。保存は `src/app/(main)/settings/actions.ts`） |
+| `src/components/charts/` | グラフ（`EventTimeline`＝寝返り・いびきのタイムライン、`LineChart`＝折れ線。触れるとその時刻の値が出る）。軸の計算は `src/lib/chart.ts` |
+| `src/components/records/` | 記録の部品（`NightRecordView`＝1晩の記録。データは `src/lib/data/night.ts` の `getNightRecord`） |
 | `src/app/(main)/loading.tsx`・`error.tsx`、`src/app/error.tsx` | 読み込み中の表示と、エラーのときの表示（「もう一度読み込む」） |
 | `src/components/home/` | ホームの部品（`DuskView`＝夕方確認、`PrepView`＝就寝準備、`SleepMonitor`＝睡眠中の即時更新、`SessionWatcher`＝セッションの変化で画面を読み直す、`MorningView`＝朝のスコア） |
 | `src/lib/supabase/` | Supabase クライアント（`client.ts`＝ブラウザ、`server.ts`＝サーバー、`proxy.ts`＝セッション更新） |
@@ -39,6 +41,7 @@ Next.js は 16 系。書き方に迷ったら、上の AGENTS.md のとおり `n
 - 外部 API（Gemini・カレンダーなど）は Webアプリから直接呼ばず、Edge Function を `supabase.functions.invoke()` で呼ぶ。
 - 見た目はプロトタイプ（`資料/nerukokko_prototype.html`）に合わせる。`src/components/ui/` に部品があるものはそれを使い、なければ `src/app/globals.css` の部品クラス（`card`・`card-title`・`btn btn-primary`・`btn-row`・`row`・`pill pill-gold`・`input`・`hint`・`dev-card-head`・`device-icon` など）を使う。新しい部品が必要なら globals.css にクラスを足し、2画面以上で使うなら `components/ui/` に部品を作る。
 - DB の読み込みでエラーが返ったら、空のデータとして扱わずに `throw` する（`error.tsx` がエラー画面を出す）。データが「ない」場合と「読めなかった」場合を混ぜない。
+- グラフは `src/components/charts/` の部品を使う（ライブラリは入れていない）。縦軸は1つだけにし、別の量は別のグラフにする。色は `var(--chart-1)`（寝返りなど1本目）・`var(--chart-2)`（いびき）。色を足すときは、夜と朝の両方の背景で見分けられるか確かめる。
 - 色は CSS 変数（`var(--fg)`・`var(--fg-dim)`・`var(--card-bg)`・`var(--inset)`・`var(--track)`）を使う。時間帯ごとに自動で切り替わる。朝（`morning`）だけ背景が明るいので、色を足したら朝と夜の両方で読めるか確かめる。
 - 文言は日本語。にわとりのセリフは「〜コケ」の口調。
 - 日時は `src/lib/format.ts` の関数で日本時間にして表示する。
