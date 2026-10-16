@@ -1,7 +1,8 @@
 // 朝の振り返り：完了した睡眠セッションのスコアを計算して保存し、にわとりのコメントを残す。
 // ingest-sensor-data（巣に戻ったとき）・close-stale-sessions（巣に戻らないまま3時間たったとき）・morning-summary（手動でやり直すとき）から呼ぶ。docs/api-spec.md §4-4・§5
 
-import { morningComment } from "./comment.ts";
+import { morningComment, morningPrompt, toOneParagraph } from "./comment.ts";
+import { generateText } from "./gemini.ts";
 import { type Db, fetchAll } from "./http.ts";
 import { computeSleepScore, type ScoreDetails } from "./score.ts";
 
@@ -75,7 +76,11 @@ export async function runMorningSummary(db: Db, sessionId: string): Promise<Morn
   if (updateError) throw new Error(updateError.message);
 
   // actual_wake_time がない完了セッションは、巣に戻らないまま自動で締めたもの（close-stale-sessions）
-  const comment = morningComment(result, profile.data?.display_name ?? "", session.actual_wake_time !== null);
+  // にわとりのコメントは Gemini で作る。キーがない・混雑・障害のときは定型文（T-203）
+  const name = profile.data?.display_name ?? "";
+  const wakeDetected = session.actual_wake_time !== null;
+  const generated = await generateText({ ...morningPrompt(result, name, wakeDetected), maxOutputTokens: 300 });
+  const comment = generated ? toOneParagraph(generated.text) : morningComment(result, name, wakeDetected);
   await saveMorningComment(db, session.user_id, sessionId, session.actual_wake_time ?? session.end_time, comment);
 
   return { session_id: sessionId, score: result.score, label: result.label, details: result.details, comment };

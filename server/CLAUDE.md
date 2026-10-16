@@ -16,7 +16,7 @@
 
 `_shared/` の部品は2種類に分ける。
 
-- **純粋な関数**（DB を使わない）：`score.ts`（睡眠スコア）・`ingest-payload.ts`（届いたデータの検証）・`comment.ts`（にわとりの定型コメント）。`import` は相対パスの `.ts` だけにし、Node のテストから直接呼べるようにする。**ロジックはできるだけここに書いてテストする。**
+- **純粋な関数**（DB を使わない）：`score.ts`（睡眠スコア）・`ingest-payload.ts`（届いたデータの検証）・`comment.ts`（にわとりの定型コメントと Gemini への指示）・`character.ts`（キャラクター設定）・`stale-session.ts`。`gemini.ts` も fetch を差し替えればテストできる。`import` は相対パスの `.ts` だけにし、Node のテストから直接呼べるようにする。**ロジックはできるだけここに書いてテストする。**
 - **DB を使う部品**：`http.ts`（エラー形式・CORS・JSON の読み込み・`fetchAll`・`runInBackground`）・`devices.ts`（鶏の認証・たまごの自動登録）・`morning-summary.ts`（朝の振り返り）。
 
 ## Edge Function の書き方
@@ -58,6 +58,18 @@ deno check --config supabase/functions/<関数名>/deno.json supabase/functions/
 # Deno が入っていなければ `npx --yes deno@2 check ...` でもよい。各関数の deno.lock（依存の版の記録）はコミットする。
 # functions serve の最中に deno check をすると、書きかけの deno.lock を読んで関数が一度だけ起動エラー（503）になることがある。もう一度呼べば直る
 ```
+
+## Gemini（AI）
+
+- 呼び出しは `_shared/gemini.ts` の `generateText()` を使う。キャラクター設定は `_shared/character.ts` の `CHICKEN_PERSONA`。
+- **キー**：`GEMINI_API_KEY`。Google AI Studio の「Get API key」で作る（田村さんのアカウント）。**2026-05-28 以降に作ったキーは `AQ.` で始まる auth key**（`AIza` で始まる古い形式ではない）。REST では `x-goog-api-key` ヘッダーで送る。
+  - ローカル：`cp supabase/functions/.env.example supabase/functions/.env` して値を入れ、`npx supabase functions serve` を起動し直す（`.env` は Git に入らない）
+  - 本番：`npx supabase secrets set GEMINI_API_KEY=...`（公開の手順 T-004）
+- **モデル**：`GEMINI_MODELS`（カンマ区切り。既定 `gemini-3.6-flash,gemini-3.8-flash`）を上から試す。混雑（503）・上限（429）・タイムアウト（10秒）なら次へ、全部だめなら `null` を返すので、呼び出し側は**必ず定型文を用意する**（`comment.ts` など）。2026-10-16 時点で `gemini-2.5-flash` は新しいユーザーには使えない。
+- 「考える量」（`thinkingLevel`）はモデルごとに決めてある（3.6 は `minimal`、3.8 は `low`）。短い返事で考えさせると、文字数の枠を使い切って返事が途中で切れる。
+- 返事は改行や空行が入るので、画面や吹き出しに出すときは `toOneParagraph()` でつなぐ。
+- **無料枠では、送った内容が Google の製品の改善に使われる**。個人を特定できる情報（メールアドレスなど）は送らない（表示名だけ送る）。
+- テストでは本物の API を呼ばず、`fetchImpl` を差し替える（`tests/functions/gemini.test.ts`）。
 
 ## 定期実行（Supabase Cron）
 
