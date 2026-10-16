@@ -16,7 +16,7 @@
 
 `_shared/` の部品は2種類に分ける。
 
-- **純粋な関数**（DB を使わない）：`score.ts`（睡眠スコア）・`ingest-payload.ts`（届いたデータの検証）・`comment.ts`（にわとりの定型コメントと Gemini への指示）・`character.ts`（キャラクター設定）・`stale-session.ts`。`gemini.ts` も fetch を差し替えればテストできる。`import` は相対パスの `.ts` だけにし、Node のテストから直接呼べるようにする。**ロジックはできるだけここに書いてテストする。**
+- **純粋な関数**（DB を使わない）：`score.ts`（睡眠スコア）・`ingest-payload.ts`（届いたデータの検証）・`comment.ts`（にわとりの定型コメントと Gemini への指示）・`character.ts`（キャラクター設定）・`chat.ts`（テキスト会話の決まりと指示）・`jst.ts`（日本時間の表示）・`stale-session.ts`。`gemini.ts` も fetch を差し替えればテストできる。`import` は相対パスの `.ts` だけにし、Node のテストから直接呼べるようにする。**ロジックはできるだけここに書いてテストする。**
 - **DB を使う部品**：`http.ts`（エラー形式・CORS・JSON の読み込み・`fetchAll`・`runInBackground`）・`devices.ts`（鶏の認証・たまごの自動登録）・`morning-summary.ts`（朝の振り返り）。
 
 ## Edge Function の書き方

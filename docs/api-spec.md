@@ -306,8 +306,12 @@ const { data } = await supabase.functions.invoke("chat", {
 // data: { chat_session_id: "…", reply: "…", fallback: false }
 ```
 
-- `message` は1〜500文字。
-- サーバーは、直近の睡眠データ・今夜の就寝提案・この会話の直近10件を AI に渡して返答を作り、`chat_messages` に保存する。
+- ログインしたユーザーだけが呼べる（Authorization ヘッダー。`supabase.functions.invoke` なら自動で付く）。
+- `message` は1〜500文字（前後の空白は除く）。それ以外は 400 `invalid_message`。
+- `chat_session_id` が本人のアプリでの会話（`trigger = 'app'`）なら続きとして扱い、なければ新しい会話を作る（返ってきた id を次から送る）。
+- サーバーは、直近の睡眠データ・今夜の就寝提案・次のアラーム・この会話の直近10件を AI に渡して返答を作り、発言と返答を `chat_messages` に保存する。
+- AI が使えないとき（キーがない・混雑・障害）は、定型の返答と `fallback: true` を返す（200）。
+- **1人1時間に30回まで**（Gemini の無料枠を使い切らないため）。超えたら AI を呼ばずに「少し休憩しよう」という定型の返答（`fallback: true`）。
 
 ### 4-4. `POST morning-summary` — 朝の振り返りの再計算
 

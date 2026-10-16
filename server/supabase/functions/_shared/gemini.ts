@@ -33,11 +33,15 @@ export type GeminiOptions = {
   fetchImpl?: typeof fetch;
 };
 
+export type GeminiTurn = { role: "user" | "model"; text: string };
+
 export type GeminiRequest = {
   /** キャラクター設定などの指示 */
   system: string;
   /** 今回のお願い（データを含む） */
   prompt: string;
+  /** それまでの会話（古い順）。チャットで使う */
+  history?: GeminiTurn[];
   maxOutputTokens?: number;
 };
 
@@ -94,7 +98,10 @@ export async function generateText(request: GeminiRequest, options: GeminiOption
         headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: request.system }] },
-          contents: [{ role: "user", parts: [{ text: request.prompt }] }],
+          contents: [
+            ...(request.history ?? []).map((turn) => ({ role: turn.role, parts: [{ text: turn.text }] })),
+            { role: "user", parts: [{ text: request.prompt }] },
+          ],
           generationConfig: {
             maxOutputTokens: request.maxOutputTokens ?? 400,
             thinkingConfig: { thinkingLevel: THINKING_LEVEL[model] ?? DEFAULT_THINKING_LEVEL },
