@@ -53,13 +53,13 @@ function env(name: string): string | undefined {
   return deno?.env.get(name);
 }
 
-/** "a, b ,,c" → ["a", "b", "c"]。空なら既定のモデル */
-export function parseModels(value: string | undefined): string[] {
+/** "a, b ,,c" → ["a", "b", "c"]。空なら fallback（既定は文章用のモデル） */
+export function parseModels(value: string | undefined, fallback: string[] = DEFAULT_MODELS): string[] {
   const models = (value ?? "")
     .split(",")
     .map((m) => m.trim())
     .filter((m) => m.length > 0);
-  return models.length > 0 ? models : DEFAULT_MODELS;
+  return models.length > 0 ? models : fallback;
 }
 
 /** 次のモデルで試し直す価値があるエラーか（混雑・回数の上限・サーバー側の障害・モデルがない） */

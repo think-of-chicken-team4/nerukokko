@@ -16,7 +16,7 @@
 
 `_shared/` の部品は2種類に分ける。
 
-- **純粋な関数**（DB を使わない）：`score.ts`（睡眠スコア）・`ingest-payload.ts`（届いたデータの検証）・`comment.ts`（にわとりの定型コメントと Gemini への指示）・`character.ts`（キャラクター設定）・`chat.ts`（テキスト会話の決まりと指示）・`evening.ts`（就寝提案の計算と指示）・`jst.ts`（日本時間の表示）・`stale-session.ts`。`gemini.ts` も fetch を差し替えればテストできる。`import` は相対パスの `.ts` だけにし、Node のテストから直接呼べるようにする。**ロジックはできるだけここに書いてテストする。**
+- **純粋な関数**（DB を使わない）：`score.ts`（睡眠スコア）・`ingest-payload.ts`（届いたデータの検証）・`comment.ts`（にわとりの定型コメントと Gemini への指示）・`character.ts`（キャラクター設定）・`chat.ts`（テキスト会話の決まりと指示）・`evening.ts`（就寝提案の計算と指示）・`announcements.ts`（鶏が話す内容の選び方）・`jst.ts`（日本時間の表示）・`stale-session.ts`。`gemini.ts` も fetch を差し替えればテストできる。`import` は相対パスの `.ts` だけにし、Node のテストから直接呼べるようにする。**ロジックはできるだけここに書いてテストする。**
 - **DB を使う部品**：`http.ts`（エラー形式・CORS・JSON の読み込み・`fetchAll`・`runInBackground`）・`devices.ts`（鶏の認証・たまごの自動登録）・`morning-summary.ts`（朝の振り返り）。
 
 ## Edge Function の書き方
@@ -68,6 +68,7 @@ deno check --config supabase/functions/<関数名>/deno.json supabase/functions/
 - **モデル**：`GEMINI_MODELS`（カンマ区切り。既定 `gemini-3.6-flash,gemini-3.8-flash`）を上から試す。混雑（503）・上限（429）・タイムアウト（10秒）なら次へ、全部だめなら `null` を返すので、呼び出し側は**必ず定型文を用意する**（`comment.ts` など）。2026-10-16 時点で `gemini-2.5-flash` は新しいユーザーには使えない。
 - 「考える量」（`thinkingLevel`）はモデルごとに決めてある（3.6 は `minimal`、3.8 は `low`）。短い返事で考えさせると、文字数の枠を使い切って返事が途中で切れる。
 - 返事は改行や空行が入るので、画面や吹き出しに出すときは `toOneParagraph()` でつなぐ。
+- **声（TTS）**は `_shared/tts.ts` の `synthesizeSpeech()`。Interactions API（`/v1beta/interactions`）で WAV（24kHz・モノラル・16bit）が返る。モデルは `GEMINI_TTS_MODELS`（既定 `gemini-3.8-flash-tts,gemini-3.8-flash-lite-tts`）。声はキャラボイスで選ぶ（にわとり＝`Puck`、ひよこ＝`Leda`。サンプルは田村さんの PC の `音声サンプル/`）。20秒ほどの文章で10秒くらいかかる。
 - **無料枠では、送った内容が Google の製品の改善に使われる**。個人を特定できる情報（メールアドレスなど）は送らない（表示名だけ送る）。
 - テストでは本物の API を呼ばず、`fetchImpl` を差し替える（`tests/functions/gemini.test.ts`）。
 

@@ -203,7 +203,10 @@ DEVICE_TOKEN=（登録時に表示された値）
     "start_time": "2026-10-01T14:10:00.000Z",
     "planned_wake_time": "2026-10-01T22:30:00.000Z"
   },
-  "settings": { "character_voice": "rooster" }
+  "settings": { "character_voice": "rooster" },
+  "announcements": [
+    { "kind": "morning_summary", "text": "テストさん、おはようコケ！昨夜は…" }
+  ]
 }
 ```
 
@@ -212,6 +215,7 @@ DEVICE_TOKEN=（登録時に表示された値）
 | `alarm` | 次に鳴らす時刻。進行中のセッションがあればその `planned_wake_time`（`source: "session"`）、なければ有効なアラームのうち次に来る時刻（`source: "alarm"`、7日以内）。どちらもなければ `null` |
 | `session` | 進行中の睡眠セッション。なければ `null`（起床予定から3時間たっても巣に戻らなかった記録は、このときに締められて `null` になる。§5） |
 | `settings.character_voice` | `rooster`（にわとり）または `chick`（ひよこ） |
+| `announcements` | 鶏が話して知らせる内容（決定ログ 2026-10-16 Q9）。ふだんは空の配列。`kind` は `evening_suggestion`（夕方の就寝提案：19時〜就寝予定、設定「夕方の就寝提案」が ON のとき）か `morning_summary`（朝のコメント：記録が終わって3時間以内、設定「朝のスコア通知」が ON のとき）。**同じ内容は一度しか渡さない**ので、受け取ったら `speak`（§3-4）で声にして流す。寝ているあいだ（記録中）は渡さない |
 
 **鶏の動作**
 
@@ -219,6 +223,26 @@ DEVICE_TOKEN=（登録時に表示された値）
 - 最後に受け取った `alarm` は手元に保存しておき、Wi-Fi が切れていても鳴らせるようにする。
 - たまごが巣に戻った（Dock Event の `docked = 1`）ら、**サーバーを待たずにその場でアラームを止め**、`ingest-sensor-data` で `charge_start` をすぐ送る。
 - 安全のため、最大30分鳴ったら止める（値は設定で変えられるようにする）。
+
+### 3-4. `POST speak` — 文章をにわとりの声にする
+
+`device-sync` の `announcements` を声にして流すときに使う。
+
+```
+POST /functions/v1/speak
+apikey: <publishable キー>
+x-device-token: <デバイストークン>
+Content-Type: application/json
+
+{ "text": "今夜は23:35までに寝るのがおすすめコケ。" }
+```
+
+**レスポンス（200）**：`{ "audio": { "mime_type": "audio/wav", "base64": "UklGR…" } }`
+
+- `text` は1〜300文字（それ以外は 400 `invalid_text`）。
+- 声は設定のキャラボイス（にわとり＝Gemini の `Puck`、ひよこ＝`Leda`）。WAV は PCM 16bit・モノラル・24kHz。
+- 声にできなかった（AI の障害など）ときは `audio: null`。鶏は保存してある定型の音声を流す。
+- 作るのに10秒ほどかかる（20秒ほどの文章の場合）。鶏は受け取ってから流す。
 
 ### 3-3. `POST voice-chat` — 音声会話
 

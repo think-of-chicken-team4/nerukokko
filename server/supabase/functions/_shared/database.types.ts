@@ -505,6 +505,7 @@ export type Database = {
       }
       sleep_recommendations: {
         Row: {
+          announced_at: string | null
           first_event_start: string | null
           first_event_title: string | null
           generated_at: string
@@ -517,6 +518,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          announced_at?: string | null
           first_event_start?: string | null
           first_event_title?: string | null
           generated_at?: string
@@ -529,6 +531,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          announced_at?: string | null
           first_event_start?: string | null
           first_event_title?: string | null
           generated_at?: string
@@ -557,6 +560,7 @@ export type Database = {
           egg_device_id: string | null
           end_time: string | null
           id: string
+          morning_announced_at: string | null
           planned_wake_time: string
           score: number | null
           score_details: Json | null
@@ -570,6 +574,7 @@ export type Database = {
           egg_device_id?: string | null
           end_time?: string | null
           id?: string
+          morning_announced_at?: string | null
           planned_wake_time: string
           score?: number | null
           score_details?: Json | null
@@ -583,6 +588,7 @@ export type Database = {
           egg_device_id?: string | null
           end_time?: string | null
           id?: string
+          morning_announced_at?: string | null
           planned_wake_time?: string
           score?: number | null
           score_details?: Json | null
