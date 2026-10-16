@@ -17,9 +17,18 @@ AGGREGATION_INTERVAL_SEC = float(os.environ.get("AGGREGATION_INTERVAL_SEC", "60"
 # 実機・配線方式が未確定のため、既定ではモック(シミュレーション)クライアントを使用する。
 # 実機接続後は RADAR_USE_MOCK=false とし、配線方式に応じて RADAR_LINK を設定すること。
 RADAR_USE_MOCK = os.environ.get("RADAR_USE_MOCK", "true").lower() == "true"
-RADAR_LINK = os.environ.get("RADAR_LINK", "spi")  # "spi" | "uart" | "socket"
+# 実機（ラズパイ＋A111）で動いたのは、exploration server（acc_exploration_server_a111）に socket でつなぐ方式（C2、Issue #16）
+RADAR_LINK = os.environ.get("RADAR_LINK", "socket")  # "socket" | "spi" | "uart"
+RADAR_HOST = os.environ.get("RADAR_HOST", "127.0.0.1")  # RADAR_LINK="socket" の場合の exploration server
 RADAR_SERIAL_PORT = os.environ.get("RADAR_SERIAL_PORT")  # RADAR_LINK="uart" の場合に使用
 RADAR_SENSOR_ID = int(os.environ.get("RADAR_SENSOR_ID", "1"))
+
+# 呼吸の誤検知を防ぐしきい値（radar_filter.py）。2026-10-16 の実測（Issue #16）から決めた初期値。
+# ベッドでの距離・角度・布団で変わるので、実機で調整する（hw-verification C2）
+RADAR_PRESENCE_ENV_MAX = float(os.environ.get("RADAR_PRESENCE_ENV_MAX", "100"))  # これ以上の反射で「人がいる」
+RADAR_BREATHING_STD_MM = float(os.environ.get("RADAR_BREATHING_STD_MM", "0.5"))  # ばらつきがこれ以上で「呼吸している」
+RADAR_WINDOW_SEC = float(os.environ.get("RADAR_WINDOW_SEC", "10"))  # 中央値をとる直近の時間
+RADAR_PRESENCE_HOLD_SEC = float(os.environ.get("RADAR_PRESENCE_HOLD_SEC", "30"))  # いる／いないが変わったと判断するまでの時間
 
 # --- SPH0645LM4H マイク(I2S) ---
 MIC_DEVICE = os.environ.get("MIC_DEVICE")  # sounddeviceのデバイス名/インデックス。未指定ならシステム既定入力

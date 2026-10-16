@@ -245,6 +245,8 @@ dtoverlay=googlevoicehat-soundcard
 
 **Issue に書くこと**：`--count` の結果（置き場所ごと）、一番よかった置き場所と距離（写真）、SDK の入手方法。
 
+
+**2026-10-16 の結果を受けて**：岡田さんの測定（#16）から、誤検知を防ぐフィルタ（`firmware/chicken/radar_filter.py`）を入れた。しきい値は `integration_config.py` の `RADAR_PRESENCE_ENV_MAX`（100）・`RADAR_BREATHING_STD_MM`（0.5）。**次は、実際のベッドの置き場所（距離・角度・布団をかけた状態）で同じ測定をして、しきい値を確かめる。**
 ---
 
 ### C3. 温湿度・照度センサー（浅井・Issue #17、関連 #4）
