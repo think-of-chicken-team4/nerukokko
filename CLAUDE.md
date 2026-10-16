@@ -159,8 +159,9 @@ cp .env.example .env.local        # 値は server/ で npx supabase status を�
 npm run dev                       # http://localhost:3000
 npm run lint && npx tsc --noEmit && npm run build
 
-# --- 鶏ユニット（Python）の構文チェック ---
+# --- 鶏ユニット（Python）の構文チェックとテスト ---
 python3 -m py_compile firmware/chicken/*.py
+cd firmware/chicken && python3 -m unittest discover -s tests   # ハードウェアに依存しない部品（radar_filter など）
 
 # --- たまごFWのビルド（PlatformIO CLI） ---
 cd firmware/egg && pio run

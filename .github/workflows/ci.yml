@@ -77,11 +77,14 @@ jobs:
       - run: pio run -e esp32dev -e hwtest_i2c_scan -e hwtest_accel -e hwtest_mic -e hwtest_dock -e hwtest_battery
 
   chicken:
-    name: 鶏（Python の構文チェック）
+    name: 鶏（Python の構文チェックとテスト）
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: python -m py_compile firmware/chicken/*.py firmware/chicken/hwtest/*.py
+      - run: python -m py_compile firmware/chicken/*.py firmware/chicken/hwtest/*.py firmware/chicken/tests/*.py
+      - name: ハードウェアに依存しない部品のテスト
+        working-directory: firmware/chicken
+        run: python -m unittest discover -s tests -v
