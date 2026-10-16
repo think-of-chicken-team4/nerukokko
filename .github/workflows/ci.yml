@@ -1,0 +1,87 @@
+# PR と main への push のたびに、壊れていないかを自動で確かめる（docs/dev-plan.md T-007）
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  app:
+    name: Webアプリ（lint・型チェック・ビルド）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    env:
+      # ビルドに必要なだけのダミー値（本物のキーは使わない）
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_dummy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm run build
+
+  backend:
+    name: バックエンド（DB・関数のテストと型チェック）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: npm ci
+      - run: npm run test:db
+      - run: npm run test:functions
+      - name: Edge Functions の型チェック
+        run: |
+          for dir in supabase/functions/*/; do
+            name=$(basename "$dir")
+            [ "$name" = "_shared" ] && continue
+            echo "== $name"
+            deno check --config "$dir/deno.json" "$dir/index.ts"
+          done
+
+  egg:
+    name: たまごFW（本番＋検証用のビルド）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firmware/egg
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: platformio-${{ hashFiles('firmware/egg/platformio.ini') }}
+      - run: pip install platformio
+      # default_envs は本番だけなので、検証用の環境も明示してビルドする
+      - run: pio run -e esp32dev -e hwtest_i2c_scan -e hwtest_accel -e hwtest_mic -e hwtest_dock -e hwtest_battery
+
+  chicken:
+    name: 鶏（Python の構文チェック）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m py_compile firmware/chicken/*.py firmware/chicken/hwtest/*.py

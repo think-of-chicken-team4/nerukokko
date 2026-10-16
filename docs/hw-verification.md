@@ -85,6 +85,16 @@ source .venv/bin/activate
 pip install -r requirements.txt -r hwtest/requirements.txt
 ```
 
+**32bit（armv7l）の Raspberry Pi OS で `pip install` が失敗するとき**（C1 で岡田さんが確認、Issue #15）
+
+| 症状 | 原因 | 対処 |
+|---|---|---|
+| `acconeer-exptool` が入らない | 依存の `libusb-package==1.0.26.3` に armv7l 用がない | `pip install --no-deps acconeer-exptool==7.18.2` で本体だけ先に入れ、`pip install libusb-package==1.0.26.1` を手で入れる（import・動作とも問題なし） |
+| `h5py` の import で `libhdf5_serial.so.103` がない | OS のライブラリが入っていない | `sudo apt install -y libhdf5-103` |
+| `numpy` の import で `libopenblas.so.0` がない | 同上 | `sudo apt install -y libopenblas0` |
+
+対処のあと、`python3 hwtest/check_setup.py` で Python パッケージがすべて ✅ になることを確かめる。
+
 ## 4. 各項目の内容
 
 各項目は「なぜやるか → やること → 合格の目安 → Issue に書くこと」の順で書いてある。

@@ -46,6 +46,7 @@
 | `firmware/*/hwtest/`・`firmware/egg/src/hwtest/` | 実機検証用のテストプログラム | 同上 | 田村（使うのは岡田・浅井） |
 | `docs/` | 仕様書・設計資料・レビュー記録 | Markdown | 全員 |
 
+- Webアプリだけの決まりは `app/CLAUDE.md`、バックエンド（Supabase）だけの決まりは `server/CLAUDE.md` にある。そのフォルダで作業するときは必ず読む。
 - ソフトウェア担当は田村・岡田・浅井の3人。**コードは田村が Claude Code で書き、岡田・浅井は実機での検証・調整を担当する**（単体の検証は 2026-10-16 まで。`docs/hw-verification.md`）。
 - 当面の進め方：Webアプリ・バックエンド・鶏／たまごのソフトは、まず Claude が全体の叩き台（動く完成形）を作る。その後、実機検証の結果を反映し、直す箇所を担当者で分けて修正する。
 - 担当外ディレクトリの変更は最小限にし、PR本文に「どこを・なぜ変えたか」を書いて担当者にレビューを依頼する。
@@ -66,9 +67,9 @@
 2. `docs/api-spec.md` — 鶏⇔サーバー、Webアプリ⇔Edge Function の通信契約
 3. `docs/ble-protocol.md` — 鶏⇔たまごの通信契約
 4. `docs/dev-plan.md` — 要件・画面仕様・タスク・決定ログ
-5. `docs/software-spec.md`・`docs/full-spec.md` — 設計時点の仕様書（変更点は dev-plan の決定ログに残す）
+5. `docs/software-spec.md`・`docs/full-spec.md` — 設計時点の仕様書（変更点は dev-plan の決定ログと `docs/spec-changes.md` に残す）
 
-仕様を変えたら、同じPRで該当ドキュメントも更新する。仕様に書かれていないことや矛盾を見つけたら、**推測で埋めずに作業者に質問する**。
+仕様を変えたら、同じPRで該当ドキュメントも更新する。**仕様書（`full-spec.md`・`software-spec.md`・`ble-protocol.md`）と違う実装をしたとき、仕様書に書いていない決まりを足したときは、`docs/spec-changes.md` に1行追加する**（メンバーと共有するため。区分は変更・追加・未決）。仕様に書かれていないことや矛盾を見つけたら、**推測で埋めずに作業者に質問する**。
 
 ## 5. Git・ブランチ運用（Claude は必ず守る）
 
@@ -144,8 +145,19 @@
 cd server && npm install          # 初回のみ（Supabase CLI と DB テスト用の PGlite が入る）
 npm run test:db                   # マイグレーションを PGlite に適用して制約・RLS・RPC をテスト（Docker 不要）
 npx supabase migration new <名前>  # 新しいマイグレーションを作る（既存のマイグレーションは書き換えない）
-npx supabase start                # ローカルの Supabase 一式を起動（Docker が必要）
+npx supabase start -x imgproxy,logflare,vector,supavisor   # ローカルの Supabase を起動（Docker Desktop が必要。使わない機能は外す）
+npx supabase status               # URL・キー・管理画面（Studio）の URL を表示
 npx supabase db reset             # ローカル DB を作り直してマイグレーションと seed を適用
+npm run gen:types                 # DB の型を作り直す（Webアプリ用と関数用。マイグレーションを変えたら必ず）
+npm run test:functions            # Edge Functions の純粋な部品（スコア計算・データ検証）のテスト
+npx supabase functions serve      # Edge Functions をローカルで動かす。詳しくは server/CLAUDE.md
+npx supabase stop                 # 止める
+
+# --- Webアプリ（app/）。詳しくは app/CLAUDE.md ---
+cd app && npm install
+cp .env.example .env.local        # 値は server/ で npx supabase status を実行して入れる
+npm run dev                       # http://localhost:3000
+npm run lint && npx tsc --noEmit && npm run build
 
 # --- 鶏ユニット（Python）の構文チェック ---
 python3 -m py_compile firmware/chicken/*.py
@@ -154,18 +166,20 @@ python3 -m py_compile firmware/chicken/*.py
 cd firmware/egg && pio run
 ```
 
-Webアプリ（`app/`）のコマンドは雛形を作ったら追記する（`docs/dev-plan.md` の T-006）。
+PR を出すと、GitHub Actions（`.github/workflows/ci.yml`）が Webアプリ・バックエンド（DB・関数）・たまご・鶏のチェックを自動で行う。
 
 - マイグレーションを追加・変更したら、`npm run test:db` を通し、必要ならテスト（`server/tests/db/schema.test.mjs`）も追加する。
 - 適用済みのマイグレーションファイルは書き換えず、変更は新しいファイルで行う（本番 DB と履歴がずれるため）。
 
 ## 9. 作業の進め方（Claude 向け手順）
 
+0. **最初に `docs/dev-plan.md` §0「現在の状況と次にやること」を読み**、今どこまで進んでいて次に何をするかを確認する。
 1. `docs/dev-plan.md` から対象タスク（`T-xxx`）を確認する。**受け入れ条件を満たすことがゴール。**
 2. 関連する仕様（§4）を読む。不明点や矛盾があれば、実装を止めて作業者に質問する。
 3. 実装したら、型チェック・lint・ビルドを通し、可能なら画面で動作確認する。
 4. `docs/dev-plan.md` のタスクの状態を更新してコミットする。
-5. 新しく決めたことや仕様の変更は、`docs/dev-plan.md` の「決定ログ」に日付付きで追記する。
+5. 新しく決めたことや仕様の変更は、`docs/dev-plan.md` の「決定ログ」に日付付きで追記する。仕様書と違うこと・仕様書にないことなら、`docs/spec-changes.md` にも追記する。
+6. その日の作業を終えるときは、`docs/dev-plan.md` §0（現在の状況・次にやること・注意点）を更新する。
 
 ## 10. モデルの使い分け（トークン節約）
 
