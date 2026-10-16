@@ -21,15 +21,19 @@ class MicSensor:
         self._stream: Optional[sd.InputStream] = None
 
     def start(self) -> None:
-        self._stream = sd.InputStream(
-            device=config.MIC_DEVICE,
-            channels=1,
-            samplerate=config.MIC_SAMPLE_RATE,
-            blocksize=config.MIC_BLOCK_SIZE,
-            dtype="int16",
-            callback=self._on_audio,
-        )
-        self._stream.start()
+        try:
+            self._stream = sd.InputStream(
+                device=config.MIC_DEVICE,
+                channels=1,
+                samplerate=config.MIC_SAMPLE_RATE,
+                blocksize=config.MIC_BLOCK_SIZE,
+                dtype="int16",
+                callback=self._on_audio,
+            )
+            self._stream.start()
+        except Exception:
+            logger.exception("マイクの初期化に失敗しました。mic_levelはnullのまま動作を続けます。")
+            self._stream = None
 
     def stop(self) -> None:
         if self._stream is not None:
