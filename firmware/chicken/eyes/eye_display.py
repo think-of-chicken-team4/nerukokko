@@ -32,10 +32,10 @@ FPS = 60
 NIGHT_BACKGROUND = (16, 20, 24)
 NIGHT_EYE = (240, 236, 224)
 NIGHT_PUPIL = (20, 24, 28)
-# 昼の配色：明るい背景に暗い目（鶏の顔らしい）
-DAY_BACKGROUND = (255, 243, 210)
-DAY_EYE = (34, 30, 28)
-DAY_PUPIL = (70, 58, 52)
+# 昼の配色：鶏らしい黄色の背景に、白目と黒い瞳（液晶でも瞳がはっきり見えるよう、コントラストを強くする）
+DAY_BACKGROUND = (255, 205, 90)
+DAY_EYE = (252, 250, 244)
+DAY_PUPIL = (28, 24, 22)
 HIGHLIGHT_COLOR = (255, 255, 255)
 EYE_WIDTH_RATIO = 0.22  # 画面の幅に対する目の幅
 EYE_HEIGHT_RATIO = 0.55  # 画面の高さに対する目の高さ（開いているとき）
