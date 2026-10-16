@@ -19,6 +19,22 @@ const dateTimeFormatter = new Intl.DateTimeFormat("ja-JP", {
   hour12: false,
 });
 
+const dateKeyFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+const monthDayWeekdayFormatter = new Intl.DateTimeFormat("ja-JP", {
+  timeZone: TIME_ZONE,
+  month: "numeric",
+  day: "numeric",
+  weekday: "short",
+});
+
+const monthDayFormatter = new Intl.DateTimeFormat("ja-JP", { timeZone: TIME_ZONE, month: "numeric", day: "numeric" });
+
 const hourFormatter = new Intl.DateTimeFormat("en-US", { timeZone: TIME_ZONE, hour: "numeric", hourCycle: "h23" });
 
 /** 例：07:30 */
@@ -34,4 +50,19 @@ export function formatDateTime(value: string | Date): string {
 /** 日本時間の「時」（0〜23） */
 export function jstHour(value: Date): number {
   return Number(hourFormatter.format(value));
+}
+
+/** 日本時間の日付（例：2026-10-16）。DB の date 型の列と比べるときに使う */
+export function jstDateKey(value: string | Date): string {
+  return dateKeyFormatter.format(new Date(value));
+}
+
+/** 例：10/3 */
+export function jstMonthDay(value: Date): string {
+  return monthDayFormatter.format(value);
+}
+
+/** 例：10/16(金) */
+export function formatMonthDayWeekday(value: Date): string {
+  return monthDayWeekdayFormatter.format(value);
 }

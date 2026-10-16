@@ -100,6 +100,8 @@ export function SimulatorPanel({ userId, initialSession }: { userId: string; ini
   const [logs, setLogs] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [auto, setAuto] = useState(false);
+  // たまごが巣にあるか。本物の鶏は Dock Event で知り、device-sync で報告する（ホームの就寝準備・デバイス画面に出る）
+  const [docked, setDocked] = useState(true);
   const tick = useRef(0);
 
   const log = useCallback((message: string) => {
@@ -171,6 +173,7 @@ export function SimulatorPanel({ userId, initialSession }: { userId: string; ini
         egg_mac_address: EGG_MAC,
         status: { egg_connected: true, egg_docked: true, egg_battery_level: 90 },
       });
+      setDocked(true);
       log("仮想の鶏・たまごを登録しました");
     });
 
@@ -211,14 +214,29 @@ export function SimulatorPanel({ userId, initialSession }: { userId: string; ini
       await send("一晩分のデータ", buildNight(new Date(session.start_time), new Date(Date.now() - 30_000)));
     });
 
+  /** 鶏と同じように、今の状態（たまごが巣にあるか など）を device-sync で報告する */
+  const reportStatus = useCallback(
+    (eggDocked: boolean) =>
+      callDeviceApi("device-sync", token!, {
+        firmware_version: FIRMWARE,
+        egg_mac_address: EGG_MAC,
+        status: { alarm_ringing: false, egg_connected: true, egg_docked: eggDocked, egg_battery_level: 88, temperature_c: 24.2 },
+      }),
+    [token],
+  );
+
+  /** 巣から取り出す・巣に戻す：充電イベントを送り、鶏と同じようにすぐ状態も報告する */
+  const moveEgg = (toNest: boolean) =>
+    runTask(async () => {
+      await send(toNest ? "巣に戻す（起床）" : "巣から取り出す", chargeNow(toNest ? "charge_start" : "charge_stop")());
+      setDocked(toNest);
+      if (token) await reportStatus(toNest);
+    });
+
   const sync = () =>
     runTask(async () => {
       if (!token) return;
-      const { status, body } = await callDeviceApi("device-sync", token, {
-        firmware_version: FIRMWARE,
-        egg_mac_address: EGG_MAC,
-        status: { alarm_ringing: false, egg_connected: true, egg_docked: !session, egg_battery_level: 88, temperature_c: 24.2 },
-      });
+      const { status, body } = await reportStatus(docked);
       const alarm = (body as { alarm?: { ring_at: string; source: string } | null }).alarm;
       log(
         status === 200
@@ -318,14 +336,16 @@ export function SimulatorPanel({ userId, initialSession }: { userId: string; ini
       <div className="card">
         <h2 className="card-title">🪺 4. 巣</h2>
         <div className="flex gap-2">
-          <button type="button" className="btn btn-secondary btn-sm" disabled={disabled} onClick={() => sendNow("巣から取り出す", chargeNow("charge_stop"))}>
+          <button type="button" className="btn btn-secondary btn-sm" disabled={disabled} onClick={() => moveEgg(false)}>
             巣から取り出す
           </button>
-          <button type="button" className="btn btn-primary btn-sm" disabled={disabled} onClick={() => sendNow("巣に戻す（起床）", chargeNow("charge_start"))}>
+          <button type="button" className="btn btn-primary btn-sm" disabled={disabled} onClick={() => moveEgg(true)}>
             巣に戻す（起床）
           </button>
         </div>
-        <p className="muted mt-2">「巣に戻す」と記録が完了し、数秒でホームに朝のスコアが出ます。</p>
+        <p className="muted mt-2">
+          いま：{docked ? "たまごは巣の中" : "たまごは巣の外（ベッドの上）"}。「巣に戻す」と記録が完了し、数秒でホームに朝のスコアが出ます。
+        </p>
       </div>
 
       <div className="card">
