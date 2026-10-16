@@ -11,14 +11,14 @@ Next.js は 16 系。書き方に迷ったら、上の AGENTS.md のとおり `n
 |---|---|
 | `src/app/(main)/` | ログイン後の画面。`layout.tsx` でログイン確認・時間帯の背景・ステータスバー・下部タブを出す |
 | `src/app/login/` | ログイン・新規登録（`actions.ts` が Server Action） |
-| `src/app/(main)/actions.ts` | ホームの Server Action（「眠りにつく」・記録の中止） |
+| `src/app/(main)/actions.ts` | ホームの Server Action（「眠りにつく」・記録の中止・就寝準備へ進む／戻る） |
 | `src/app/(main)/dev/simulator/` | デバイスシミュレーター（鶏の代わりに API へデータを送る開発・デモ用） |
 | `src/components/` | 画面の枠の部品（`StatusBar`・`Clock`・`BottomNav`・`PhaseDial`・`ErrorView`） |
 | `src/components/ui/` | どの画面でも使う部品：`Switch`（ON/OFF）・`SegmentedControl`（今夜／週間などの切り替え、URL で切り替える）・`ChickenBubble`（にわとりのセリフ）・`Stat`/`StatGrid`（数値のタイル）・`ScoreRing`（スコアの円）・`LogItem`（履歴の1行） |
 | `src/components/device/` | デバイスの部品（`ChickenRegistration`＝鶏の登録・トークンの再発行・交換。登録は `src/app/(main)/device/actions.ts`） |
 | `src/components/settings/` | 設定の部品（`AlarmSettings`＝アラームの一覧・編集、`NotificationSettings`＝通知の ON/OFF とキャラボイス。保存は `src/app/(main)/settings/actions.ts`） |
 | `src/app/(main)/loading.tsx`・`error.tsx`、`src/app/error.tsx` | 読み込み中の表示と、エラーのときの表示（「もう一度読み込む」） |
-| `src/components/home/` | ホームの部品（`SleepMonitor`＝睡眠中の即時更新、`SessionWatcher`＝セッションの変化で画面を読み直す、`MorningView`＝朝のスコア） |
+| `src/components/home/` | ホームの部品（`DuskView`＝夕方確認、`PrepView`＝就寝準備、`SleepMonitor`＝睡眠中の即時更新、`SessionWatcher`＝セッションの変化で画面を読み直す、`MorningView`＝朝のスコア） |
 | `src/lib/supabase/` | Supabase クライアント（`client.ts`＝ブラウザ、`server.ts`＝サーバー、`proxy.ts`＝セッション更新） |
 | `src/lib/data/` | DB から読んで判定する処理（今のフェーズ、睡眠中・朝の表示データ、デバイスのオンライン判定・たまごの場所・MAC アドレスの整形） |
 | `src/lib/supabase/realtime.ts` | Realtime の購読（`subscribeAsUser`） |
@@ -61,6 +61,7 @@ cd ../server && npm run gen:types
 - `npm run lint`・`npx tsc --noEmit`・`npm run build` が通ること。
 - パッケージを追加・更新したら、`npm ci --dry-run` が通ることも確認する（`package-lock.json` が食い違っていると CI の `npm ci` が失敗する）。失敗したら `node_modules` を消して `npm install` し直す。Node.js は 22 以上を使う。
 - 画面を変えたら、`npm run dev` でブラウザから実際に操作して確認する（スマホ幅 390px で見る）。
+- ホームのフェーズは `getHomePhase()`（`@/lib/data/phase`）で判定する（layout とページで同じ結果になる）。就寝準備は cookie で覚えているので、`has()` ではなく値で確かめる（消した直後の再描画では空の値で残って見える）。
 - 鶏・たまごがなくても、デバイスシミュレーター（設定 →「デバイスシミュレーターを開く」、`/dev/simulator`）で1日の流れを試せる。「仮想の鶏・たまごを登録」→「今から眠る」か「8時間前に寝たことにする」→ データを送る →「巣に戻す（起床）」。関数（`npx supabase functions serve`）を起動しておくこと。
 - ローカルのテスト用ユーザーは、ログイン画面の「新規登録」で作れる（ローカルではメール確認なし）。
   - 例：名前「テスト」、`tamago@example.com`／`kokekokko123`（ローカルの Supabase にだけ存在するテスト用。`npx supabase db reset` で消えるので、そのときは作り直す）

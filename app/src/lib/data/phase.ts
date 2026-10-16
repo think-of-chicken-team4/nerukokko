@@ -1,11 +1,17 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
 
 import { jstHour } from "@/lib/format";
 import type { Phase } from "@/lib/phase";
 import type { Database } from "@/types/database";
 
-// 「就寝準備（prep）」は画面の操作で入るフェーズなので、DB からは判定しない
+// 「就寝準備（prep）」は画面の操作で入るフェーズなので、DB からは判定しない（getHomePhase で cookie を見る）
 export type DbPhase = Exclude<Phase, "prep">;
+
+/** 「就寝準備へ進む」を押したことを覚えておく cookie。上部のステータスバー（layout）からも読めるように cookie にする */
+export const PREP_COOKIE = "nerukokko-prep";
+/** 押してから眠らないまま、この時間がたったら夕方確認に戻す */
+export const PREP_MAX_AGE_SEC = 6 * 60 * 60;
 
 export type PhaseSession = { id: string; start_time: string; planned_wake_time: string };
 
@@ -55,4 +61,18 @@ export async function getCurrentPhase(
   }
 
   return { phase: "dusk", session: null };
+}
+
+/**
+ * ホームに表示するフェーズ。DB で「夕方確認」と判定され、「就寝準備へ進む」を押していれば「就寝準備」にする（§5-2）。
+ */
+export async function getHomePhase(
+  supabase: SupabaseClient<Database>,
+): Promise<{ phase: Phase; session: PhaseSession | null }> {
+  const current = await getCurrentPhase(supabase);
+  // has() ではなく値で見る。「戻る」で消した直後の再描画では、消した cookie が空の値で残って見えるため
+  if (current.phase === "dusk" && (await cookies()).get(PREP_COOKIE)?.value === "1") {
+    return { phase: "prep", session: null };
+  }
+  return current;
 }

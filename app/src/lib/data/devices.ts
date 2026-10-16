@@ -1,3 +1,7 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+import type { Database } from "@/types/database";
+
 // 鶏・たまごの状態の判定
 
 /** 最終通信がこの時間以内ならオンラインとみなす（鶏は30秒ごとに device-sync を呼ぶ） */
@@ -68,4 +72,27 @@ export function normalizeMacInput(input: string): string | null {
   const hex = input.trim().toUpperCase().replace(/[:-]/g, "");
   if (!/^[0-9A-F]{12}$/.test(hex)) return null;
   return hex.match(/.{2}/g)!.join(":");
+}
+
+export type DeviceReadiness = {
+  /** 鶏が未登録なら null */
+  chickenOnline: boolean | null;
+  eggRegistered: boolean;
+  eggPlace: EggPlace;
+};
+
+/** 就寝準備・睡眠中に出す「鶏・たまごの準備ができているか」 */
+export async function getDeviceReadiness(
+  supabase: SupabaseClient<Database>,
+  sessionActive: boolean,
+  now: Date = new Date(),
+): Promise<DeviceReadiness> {
+  const { data, error } = await supabase.from("devices").select("type, last_seen, status");
+  if (error) throw new Error(`デバイスを読めませんでした: ${error.message}`);
+  const chicken = data.find((d) => d.type === "chicken");
+  return {
+    chickenOnline: chicken ? isOnline(chicken.last_seen, now) : null,
+    eggRegistered: data.some((d) => d.type === "egg"),
+    eggPlace: chicken ? eggPlace(parseDeviceStatus(chicken.status), sessionActive, now) : "unknown",
+  };
 }
