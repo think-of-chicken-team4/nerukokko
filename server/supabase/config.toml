@@ -446,3 +446,15 @@ entrypoint = "./functions/morning-summary/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/morning-summary/*.html" ]
+
+
+[functions.close-stale-sessions]
+enabled = true
+verify_jwt = false
+import_map = "./functions/close-stale-sessions/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/close-stale-sessions/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/close-stale-sessions/*.html" ]

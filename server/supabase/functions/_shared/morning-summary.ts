@@ -1,5 +1,5 @@
 // 朝の振り返り：完了した睡眠セッションのスコアを計算して保存し、にわとりのコメントを残す。
-// ingest-sensor-data（巣に戻ったとき）と morning-summary（手動でやり直すとき）から呼ぶ。docs/api-spec.md §4-4・§5
+// ingest-sensor-data（巣に戻ったとき）・close-stale-sessions（巣に戻らないまま3時間たったとき）・morning-summary（手動でやり直すとき）から呼ぶ。docs/api-spec.md §4-4・§5
 
 import { morningComment } from "./comment.ts";
 import { type Db, fetchAll } from "./http.ts";
@@ -73,7 +73,8 @@ export async function runMorningSummary(db: Db, sessionId: string): Promise<Morn
     .eq("id", sessionId);
   if (updateError) throw new Error(updateError.message);
 
-  const comment = morningComment(result, profile.data?.display_name ?? "");
+  // actual_wake_time がない完了セッションは、巣に戻らないまま自動で締めたもの（close-stale-sessions）
+  const comment = morningComment(result, profile.data?.display_name ?? "", session.actual_wake_time !== null);
   await saveMorningComment(db, session.user_id, sessionId, session.actual_wake_time ?? session.end_time, comment);
 
   return { session_id: sessionId, score: result.score, label: result.label, details: result.details, comment };

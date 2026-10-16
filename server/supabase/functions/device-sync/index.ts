@@ -2,8 +2,9 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "@supabase/server";
 
+import { closeStaleSessions, summarizeClosed } from "../_shared/close-stale.ts";
 import { authenticateChicken, resolveEgg } from "../_shared/devices.ts";
-import { CORS, type Db, jsonError, readJson } from "../_shared/http.ts";
+import { CORS, type Db, jsonError, readJson, runInBackground } from "../_shared/http.ts";
 import { normalizeMac } from "../_shared/ingest-payload.ts";
 
 const MAX_BODY_BYTES = 16 * 1024;
@@ -65,6 +66,11 @@ export default {
         if (error) throw new Error(error.message);
       }
     }
+
+    // 巣に戻らないまま起床予定から3時間たった記録を締める（定期実行の close-stale-sessions の予備。T-209）
+    // 締めたあとは進行中のセッションがなくなるので、鶏のアラームも止まる（alarm は次のアラームになる）
+    const closed = await closeStaleSessions(db, { userId: chicken.user_id, now });
+    if (closed.length > 0) runInBackground(summarizeClosed(db, closed), "morning-summary (stale)");
 
     const [sessionResult, alarmResult, settingsResult] = await Promise.all([
       db

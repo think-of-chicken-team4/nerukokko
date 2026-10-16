@@ -4,9 +4,15 @@
 
 import type { ScoreResult } from "./score.ts";
 
-export function morningComment(result: ScoreResult, displayName: string): string {
+/**
+ * wakeDetected = false は、巣に戻したことを検知できず、起床予定の3時間後で記録を締めたとき（T-209）。
+ */
+export function morningComment(result: ScoreResult, displayName: string, wakeDetected = true): string {
   const { score, label, details } = result;
   const greeting = `${displayName ? `${displayName}さん、` : ""}おはようコケ！昨夜のスコアは${score}点、「${label}」だったコケ。`;
+  const notice = wakeDetected
+    ? ""
+    : "たまごが巣に戻ったのがわからなかったから、起床予定の3時間後までで記録を締めたコケ。朝はたまごを巣に戻してほしいコケ。";
 
   const turns = details.turn_balance?.count ?? 0;
   const latency = details.efficiency?.onset_latency_min ?? 0;
@@ -27,5 +33,5 @@ export function morningComment(result: ScoreResult, displayName: string): string
   } else {
     advice = "今夜は少し早めにお布団に入って、ゆっくり休もうコケ。";
   }
-  return `${greeting}${advice}`;
+  return `${greeting}${notice}${advice}`;
 }

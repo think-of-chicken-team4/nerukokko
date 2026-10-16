@@ -42,6 +42,8 @@ function Chart(props: {
 export function NightRecordView({ record }: { record: NightRecord }) {
   const { session, range } = record;
   const status = STATUS[session.status as keyof typeof STATUS] ?? STATUS.completed;
+  // 完了しているのに起床時刻がない＝巣に戻らないまま自動で締めた夜（T-209）
+  const autoClosed = session.status === "completed" && session.actual_wake_time === null;
   const hasEvents = record.motions.length > 0 || record.audio.length > 0;
 
   return (
@@ -57,6 +59,7 @@ export function NightRecordView({ record }: { record: NightRecord }) {
           </div>
           <span className={`pill ${status.pill}`}>{status.label}</span>
         </div>
+        {autoClosed && <p className="hint mt-2 mb-0">⚠️ 起床を検知できなかったので、起床予定の3時間後で記録を締めました。</p>}
         {session.score !== null && (
           <div className="mt-2 flex items-baseline gap-2">
             <span className="font-num text-[28px] font-bold">{session.score}</span>

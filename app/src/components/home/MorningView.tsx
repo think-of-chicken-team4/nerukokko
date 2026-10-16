@@ -13,7 +13,7 @@ function durationText(startTime: string, endTime: string | null): string {
 }
 
 function wakeDelayText(planned: string, actual: string | null): string {
-  if (!actual) return "—";
+  if (!actual) return "検知なし";
   const seconds = Math.round((new Date(actual).getTime() - new Date(planned).getTime()) / 1000);
   if (seconds <= 0) return "アラーム前";
   return seconds < 120 ? `${seconds}秒` : `${Math.round(seconds / 60)}分`;
@@ -24,8 +24,16 @@ export function MorningView({ data }: { data: MorningData }) {
   const { session, comment, counts } = data;
   const score = session.score;
 
+  // 巣に戻したことを検知できず、起床予定の3時間後で自動で締めた夜（T-209）は actual_wake_time がない
+  const wakeDetected = session.actual_wake_time !== null;
+
   return (
     <>
+      {!wakeDetected && (
+        <p className="hint">
+          ⚠️ たまごが巣に戻ったことを検知できなかったので、起床予定の3時間後で記録を締めました。朝はたまごを巣に戻してください（充電の接触も確かめてください）。
+        </p>
+      )}
       <div className="card text-center">
         <div className="eyebrow">睡眠スコア</div>
         {score === null ? (
