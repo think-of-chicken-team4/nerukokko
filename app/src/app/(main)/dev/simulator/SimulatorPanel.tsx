@@ -246,7 +246,7 @@ export function SimulatorPanel({ userId, initialSession }: { userId: string; ini
       log(
         data?.recommendation
           ? `就寝提案：${formatTime(data.recommendation.recommended_bedtime)} までに寝る（ホームの夕方確認に出ます）`
-          : "就寝提案：24時間以内のアラームがないので作りませんでした（設定でアラームを入れてください）",
+          : "就寝提案：24時間以内のアラームも明日の予定もないので作りませんでした（設定でアラームを入れてください）",
       );
     });
 

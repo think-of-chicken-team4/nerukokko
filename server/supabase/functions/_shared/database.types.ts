@@ -390,6 +390,41 @@ export type Database = {
           },
         ]
       }
+      google_credentials: {
+        Row: {
+          access_token: string | null
+          connected_at: string
+          expires_at: string | null
+          refresh_token: string
+          scope: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          connected_at?: string
+          expires_at?: string | null
+          refresh_token: string
+          scope?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string | null
+          connected_at?: string
+          expires_at?: string | null
+          refresh_token?: string
+          scope?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_credentials_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       motion_events: {
         Row: {
           detection_source: string
@@ -459,6 +494,35 @@ export type Database = {
             foreignKeyName: "notification_settings_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      oauth_states: {
+        Row: {
+          created_at: string
+          redirect_uri: string
+          state: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          redirect_uri: string
+          state: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          redirect_uri?: string
+          state?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oauth_states_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
@@ -646,6 +710,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calendar_status: {
+        Args: never
+        Returns: {
+          connected: boolean
+          connected_at: string
+        }[]
+      }
       next_alarm_at: {
         Args: { p_from?: string; p_user_id: string }
         Returns: {
