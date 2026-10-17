@@ -24,7 +24,7 @@ from bleak import BleakClient, BleakScanner  # noqa: E402
 from bleak.exc import BleakError  # noqa: E402
 
 import ble_config  # noqa: E402
-from sensor_data import AudioLevel, DockEvent, Environment, MotionEvent  # noqa: E402
+from sensor_data import AudioLevel, DockEvent, MotionEvent  # noqa: E402
 
 AUDIO_INTERVAL_SEC = 0.3  # たまごの AUDIO_NOTIFY_INTERVAL_MS と同じ
 AUDIO_GAP_WARN_SEC = 2.0  # これ以上 Audio Level が途切れたら表示する
@@ -32,7 +32,6 @@ AUDIO_GAP_WARN_SEC = 2.0  # これ以上 Audio Level が途切れたら表示す
 CHARACTERISTICS = {
     "audio": (ble_config.CHAR_AUDIO_UUID, AudioLevel),
     "motion": (ble_config.CHAR_MOTION_UUID, MotionEvent),
-    "environment": (ble_config.CHAR_ENV_UUID, Environment),
     "dock": (ble_config.CHAR_DOCK_UUID, DockEvent),
 }
 
@@ -99,9 +98,6 @@ class Monitor:
             elif name == "motion":
                 self.log(name, value.x, value.y, value.z)
                 print(f"[Motion] x={value.x} y={value.y} z={value.z}")
-            elif name == "environment":
-                self.log(name, f"{value.temperature:.2f}", f"{value.humidity:.2f}", value.lux)
-                print(f"[Environment] {value.temperature:.1f}℃ {value.humidity:.1f}% {value.lux}lx")
             elif name == "dock":
                 self.log(name, int(value.docked))
                 print(f"[Dock] {'巣に置いた（docked=1）' if value.docked else '取り出した（docked=0）'}")
@@ -170,7 +166,7 @@ class Monitor:
             rate = counts["audio"] / expected * 100
             print(
                 f"--- {minute}分目：Audio {counts['audio']}件（受信率 {rate:.0f}%）"
-                f" Motion {counts['motion']}件 Environment {counts['environment']}件 Dock {counts['dock']}件"
+                f" Motion {counts['motion']}件 Dock {counts['dock']}件"
                 f" 最大の途切れ {self.stats.minute_max_audio_gap:.1f}秒 ---"
             )
             self.stats.minute_counts = {name: 0 for name in CHARACTERISTICS}
@@ -191,7 +187,7 @@ class Monitor:
         print("\n==== まとめ（この結果を Issue に貼ってください）====")
         print(f"計測時間：{total / 60:.1f}分　接続していた時間：{connected / 60:.1f}分（{connected / total * 100 if total else 0:.0f}%）")
         print(f"Audio Level：{stats.counts['audio']}件（接続中の受信率 {audio_rate:.1f}%、取りこぼし {max(0.0, 100 - audio_rate):.1f}%）")
-        print(f"Motion：{stats.counts['motion']}件　Environment：{stats.counts['environment']}件　Dock：{stats.counts['dock']}件")
+        print(f"Motion：{stats.counts['motion']}件　Dock：{stats.counts['dock']}件")
         print(f"Audio Level の最大の途切れ：{stats.max_audio_gap:.1f}秒")
         print(f"切断：{stats.disconnects}回　再接続にかかった時間の平均：{average_reconnect:.1f}秒")
         print(f"最後にデータが届いた時刻：{stats.last_packet_wall}（E5 のバッテリー測定で使う）")

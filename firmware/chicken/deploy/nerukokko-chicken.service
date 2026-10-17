@@ -1,0 +1,18 @@
+# 鶏のプログラムを、ラズパイの電源を入れたら自動で起動する（F-06）。deploy/install.sh が /etc/systemd/system/ にコピーする。
+# ログ：journalctl -u nerukokko-chicken -f
+[Unit]
+Description=NeruKokko chicken (sleep assistant)
+After=network-online.target bluetooth.target sound.target acconeer-server.service
+Wants=network-online.target
+
+[Service]
+# LED（WS2812B）を光らせるには root が必要（rpi_ws281x が /dev/mem を使うため）
+User=root
+WorkingDirectory=/opt/nerukokko/firmware/chicken
+EnvironmentFile=/etc/nerukokko/chicken.env
+ExecStart=/opt/nerukokko/firmware/chicken/.venv/bin/python main.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

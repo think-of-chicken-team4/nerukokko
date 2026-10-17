@@ -16,13 +16,6 @@ struct MotionEventData {
 };
 static_assert(sizeof(MotionEventData) == 6, "MotionEventData must be 6 bytes");
 
-struct EnvironmentData {
-    float temperature; // °C
-    float humidity;    // %RH
-    uint16_t lux;
-};
-static_assert(sizeof(EnvironmentData) == 10, "EnvironmentData must be 10 bytes");
-
 struct DockEventData {
     uint8_t docked; // 0 = undocked(就寝開始), 1 = docked(起床)
 };

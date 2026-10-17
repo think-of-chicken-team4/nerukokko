@@ -1,37 +1,45 @@
 #pragma once
 
+// たまご（ESP32）のピンと、実機で調整する値をここに集める。
+// 「実機で調整」と書いた値は、docs/hw-verification.md の検証（E1〜E5）の結果で決める。値を変えたら Issue に測定値を残す。
+
 #include <cstdint>
 
-// --- PDM mic (ADA-4346) ---
+// ===== PDM マイク（ADA-4346）=====
 constexpr int PDM_CLK_PIN = 32;
 constexpr int PDM_DATA_PIN = 33;
 constexpr uint32_t AUDIO_SAMPLE_RATE_HZ = 16000;
-constexpr uint32_t AUDIO_NOTIFY_INTERVAL_MS = 300; // 0.2〜0.5秒ごと
+constexpr uint32_t AUDIO_NOTIFY_INTERVAL_MS = 300;  // 音量を鶏へ送る間隔（0.2〜0.5秒ごと）
 
-// --- Accelerometer (SEN0142 = MPU-6050, I2C。ピン: VIN/GND/SDA/SCL/INT、AD0未配線のためアドレスは既定の0x68) ---
-// ACCEL_X/Y/Z_PINはアナログ3軸だった頃の名残。本番コード(MotionSensor.cpp)はI2Cのみを使うが、
-// hwtest/accel_test.cppのアナログフォールバック用に残している。
-constexpr int ACCEL_X_PIN = 34;
-constexpr int ACCEL_Y_PIN = 35;
-constexpr int ACCEL_Z_PIN = 36;
-constexpr uint32_t MOTION_POLL_INTERVAL_MS = 100;     // 閾値監視の周期
-constexpr uint32_t MOTION_FALLBACK_INTERVAL_MS = 5000; // 保険の定期送信
-// 前回値との差分がこれを超えたらイベント送信。
-// アナログADC値時代の閾値をそのまま残しており、MPU-6050の生値(±2gで16384LSB/g)には
-// 未対応。実機で寝返りをさせて再調整すること(hw-verification.md E1、Issue #3)。
-constexpr int16_t MOTION_THRESHOLD = 400;
-
-// --- Temperature & Humidity (SEN0137, I2C SHT20 protocol) ---
-constexpr uint8_t SHT20_I2C_ADDR = 0x40;
+// ===== I2C（加速度センサー）=====
 constexpr int I2C_SDA_PIN = 21;
 constexpr int I2C_SCL_PIN = 22;
 
-// --- Illuminance (SEN0097, analog) ---
-constexpr int LUX_ANALOG_PIN = 39;
+// ===== 加速度センサー（SEN0142 = MPU-6050、I2C 0x68）=====
+constexpr uint8_t MPU6050_I2C_ADDR = 0x68;           // AD0 を GND（未配線）にしたときのアドレス
+constexpr float MPU6050_LSB_PER_G = 16384.0f;        // 測定範囲 ±2g のとき 16384 = 1g
+constexpr uint32_t MOTION_POLL_INTERVAL_MS = 100;     // 加速度を読む間隔
+constexpr uint32_t MOTION_FALLBACK_INTERVAL_MS = 5000; // 動きがなくても、この間隔で今の値を送る（つながっている確認用）
+// 【実機で調整：E1・Issue #33】前回の値からの変化がこれ（g）を超えたら「動きあり」として送る。
+// 静止時のノイズは 0.004〜0.007g（2026-10 の測定）。寝返り10回をきちんと数え、呼吸や小さな動きで反応しない値にする
+constexpr float MOTION_THRESHOLD_G = 0.05f;
+constexpr int16_t MOTION_THRESHOLD = static_cast<int16_t>(MOTION_THRESHOLD_G * MPU6050_LSB_PER_G);
 
-constexpr uint32_t ENV_NOTIFY_INTERVAL_MS = 30000; // 30秒〜1分ごと
+// アナログ3軸だった頃のピン。本番では使わない（hwtest/accel_test.cpp のアナログ確認用に残している）
+constexpr int ACCEL_X_PIN = 34;
+constexpr int ACCEL_Y_PIN = 35;
+constexpr int ACCEL_Z_PIN = 36;
 
-// --- Dock Event (充電モジュール SFE-PRT-14380 / MCP73831 STATピン) ---
-// STATはオープンドレイン: 外付けプルアップ抵抗(4.7k〜47kΩ)でHIGHに引き上げる
+// ===== 充電検知（充電モジュール SFE-PRT-14380 / MCP73831 の STAT ピン）=====
+// STAT はオープンドレイン：充電中は LOW（巣に置いた）、充電していないときは外付けのプルアップで HIGH
 constexpr int DOCK_STAT_PIN = 27;
-constexpr uint32_t DOCK_DEBOUNCE_MS = 200; // チャタリング対策
+// 【実機で調整：E3・Issue #5】この時間、同じ状態が続いたら「巣に置いた／取り出した」と確定する（ポゴピンのチャタリング対策）
+constexpr uint32_t DOCK_DEBOUNCE_MS = 300;
+
+// ===== バッテリー残量（F-09。配線が決まったら使う：E5）=====
+// 電池の電圧を抵抗で分圧して ADC で読む。-1 のときは読まない（BLE の Battery も出さない）
+constexpr int BATTERY_ADC_PIN = -1;
+constexpr float BATTERY_DIVIDER_RATIO = 2.0f;      // 分圧比（電池の電圧 = ADC の電圧 × この値）
+constexpr uint32_t BATTERY_FULL_MV = 4200;         // 満充電の電圧
+constexpr uint32_t BATTERY_EMPTY_MV = 3300;        // これで 0%（保護回路が切れる少し前）
+constexpr uint32_t BATTERY_NOTIFY_INTERVAL_MS = 60000;

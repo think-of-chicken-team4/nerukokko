@@ -1,12 +1,15 @@
+// たまご（ESP32）：寝返り（加速度）・音量（マイク）・充電（巣に置いた／取り出した）を鶏へ BLE で送る。
+// 実機で調整する値は include/PinConfig.h に集めてある。docs/ble-protocol.md
 #include <Arduino.h>
 
+#include "AudioSensor.h"
+#include "BatterySensor.h"
+#include "BleManager.h"
+#include "DockSensor.h"
+#include "Log.h"
+#include "MotionSensor.h"
 #include "PinConfig.h"
 #include "SensorData.h"
-#include "BleManager.h"
-#include "AudioSensor.h"
-#include "MotionSensor.h"
-#include "EnvironmentSensor.h"
-#include "DockSensor.h"
 
 #ifdef NERUKOKKO_UPTIME_LOG
 #include "hwtest/UptimeLog.h"  // E5：バッテリーの持ちの測定用（hwtest_battery 環境だけ）
@@ -16,13 +19,13 @@ namespace {
 BleManager bleManager;
 AudioSensor audioSensor;
 MotionSensor motionSensor;
-EnvironmentSensor environmentSensor;
 DockSensor dockSensor;
+BatterySensor batterySensor;
 
 uint32_t lastAudioNotifyMs = 0;
 uint32_t lastMotionPollMs = 0;
 uint32_t lastMotionFallbackMs = 0;
-uint32_t lastEnvNotifyMs = 0;
+uint32_t lastBatteryNotifyMs = 0;
 
 #ifdef NERUKOKKO_UPTIME_LOG
 UptimeLog uptimeLog;
@@ -34,11 +37,11 @@ void setup() {
 
     audioSensor.begin();
     motionSensor.begin();
-    environmentSensor.begin();
     dockSensor.begin();
-    bleManager.begin();
+    batterySensor.begin();
+    bleManager.begin(dockSensor.current());
 
-    Serial.println("[Setup] complete. Advertising as NeruKokko-Tamago.");
+    LOGF("[Setup] 準備完了。NeruKokko-Tamago としてアドバタイズ中（巣に%s）\n", dockSensor.current().docked ? "ある" : "ない");
 
 #ifdef NERUKOKKO_UPTIME_LOG
     uptimeLog.begin();
@@ -52,7 +55,7 @@ void loop() {
         lastAudioNotifyMs = now;
         AudioLevelData audio{audioSensor.readLevel()};
         bleManager.notifyAudio(audio);
-        Serial.printf("[Audio] level=%u\n", audio.level);
+        LOGF("[Audio] level=%u\n", audio.level);
     }
 
     if (now - lastMotionPollMs >= MOTION_POLL_INTERVAL_MS) {
@@ -61,26 +64,29 @@ void loop() {
         if (motionSensor.checkThresholdEvent(motion)) {
             bleManager.notifyMotion(motion);
             lastMotionFallbackMs = now;
-            Serial.printf("[Motion] threshold event x=%d y=%d z=%d\n", motion.x, motion.y, motion.z);
+            LOGF("[Motion] 動きあり x=%d y=%d z=%d\n", motion.x, motion.y, motion.z);
         } else if (now - lastMotionFallbackMs >= MOTION_FALLBACK_INTERVAL_MS) {
             lastMotionFallbackMs = now;
-            MotionEventData fallback = motionSensor.read();
-            bleManager.notifyMotion(fallback);
-            Serial.printf("[Motion] fallback x=%d y=%d z=%d\n", fallback.x, fallback.y, fallback.z);
+            if (motionSensor.read(motion)) {
+                bleManager.notifyMotion(motion);
+                LOGF("[Motion] 定期 x=%d y=%d z=%d\n", motion.x, motion.y, motion.z);
+            } else {
+                LOGF("[Motion] I2C の読み取りに失敗\n");
+            }
         }
-    }
-
-    if (now - lastEnvNotifyMs >= ENV_NOTIFY_INTERVAL_MS) {
-        lastEnvNotifyMs = now;
-        EnvironmentData env = environmentSensor.read();
-        bleManager.notifyEnvironment(env);
-        Serial.printf("[Environment] temp=%.2f humidity=%.2f lux=%u\n", env.temperature, env.humidity, env.lux);
     }
 
     DockEventData dock;
     if (dockSensor.pollEvent(dock)) {
         bleManager.notifyDock(dock);
-        Serial.printf("[Dock] docked=%u\n", dock.docked);
+        LOGF("[Dock] %s\n", dock.docked ? "巣に置いた（起床）" : "巣から取り出した");
+    }
+
+    if (batterySensor.enabled() && now - lastBatteryNotifyMs >= BATTERY_NOTIFY_INTERVAL_MS) {
+        lastBatteryNotifyMs = now;
+        uint8_t percent = batterySensor.readPercent();
+        bleManager.notifyBattery(percent);
+        LOGF("[Battery] %u%%\n", percent);
     }
 
 #ifdef NERUKOKKO_UPTIME_LOG
