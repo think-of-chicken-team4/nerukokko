@@ -9,6 +9,9 @@
 - **期限**：単体の検証12項目は **2026-10-16（金）** まで。結合テスト5項目は11月（ソフトの完成後）。
 - 結果（測った値・うまくいかなかったこと・写真・ログ）は、**項目ごとの Issue にコメント**で残す。AI がコードを直すときの材料になる。
 - しきい値やピン番号などを変えたら、その値と理由も Issue に書く。
+- **決めた値を入れる場所**（2026-10-17 から。コードを直さなくてよい）：
+  - たまご：`firmware/egg/include/PinConfig.h`（「実機で調整」と書いた値。例：E1 の `MOTION_THRESHOLD_G`、E3 の `DOCK_DEBOUNCE_MS`、E5 の `BATTERY_ADC_PIN`）。書き込みは `pio run -e esp32dev -t upload`（シリアルに様子を出したいときは `esp32dev_debug`）
+  - 鶏：`/etc/nerukokko/chicken.env`（一覧は `firmware/chicken/README.md`「調整する値」。例：C2 の `RADAR_PRESENCE_ENV_MAX`、C3 の `ENV_TEMP_OFFSET_C`、C5 の `SPEAKER_VOLUME`）
 - 困ったら、測った値・写真・ログを添えて田村に相談する（Claude Code に渡して原因を調べられる）。
 
 ## 1. 一覧と担当
