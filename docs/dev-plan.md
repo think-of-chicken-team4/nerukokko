@@ -125,7 +125,7 @@ Docker Desktop を起動してから、それぞれ別のターミナルで：
 - RLS：クライアントは自分のデータだけ読める。計測データ・会話・提案の書き込みは Edge Function だけ。
 - RPC：`register_device`（デバイス登録とトークン発行）、`next_alarm_at`（次に鳴らすアラーム時刻）。
 - テスト：`cd server && npm run test:db`（PGlite で制約・RLS・RPC を確認。Docker 不要）。
-- カレンダー用の `google_credentials` は T-205 で追加する。
+- カレンダー連携（T-205）：`google_credentials`（トークン。クライアントからは読めない）・`oauth_states`、RPC `calendar_status()`（連携しているかだけ）。
 
 ## 5. 画面仕様
 
@@ -214,7 +214,7 @@ Docker Desktop を起動してから、それぞれ別のターミナルで：
 | T-001 | 開発ルール整備（CLAUDE.md・CONTRIBUTING.md・dev-plan・PRテンプレート） | O | ✅ | main にマージされ、全員が読める |
 | T-002 | `ren` ブランチのレビューとマージ | O | ✅ | PR #2 でマージ済み。残りの指摘は Issue #3〜#6 |
 | T-003 | `docs/api-spec.md` 作成（ingest / device-sync / chat / voice-chat の契約、デバイス認証） | O | ✅ v1.0 で決定 | リクエスト・レスポンスの JSON 例とエラー仕様がある |
-| T-004 | アカウント作成（Supabase・Gemini API キー・Google Cloud の OAuth クライアント・Vercel）と Supabase CLI 初期化（`server/supabase/`） | O | 🟡 ローカル環境（Docker）で起動できる。クラウドのアカウントは公開時（ステップ6）に作成 | 作成手順が docs にあり、キーは各自の `.env` とSupabaseのシークレットにだけ入っている。`npx supabase` で migrations・functions を管理でき、コマンドが CLAUDE.md §8 にある |
+| T-004 | アカウント作成（Supabase・Gemini API キー・Google Cloud の OAuth クライアント・Vercel）と Supabase CLI 初期化（`server/supabase/`） | O | 🟡 ローカル環境（Docker）で起動できる。クラウドの手順は `docs/cloud-setup.md`（10/17 作成）。アカウントは公開時（ステップ6）に田村さんが作る | 作成手順が docs にあり、キーは各自の `.env` とSupabaseのシークレットにだけ入っている。`npx supabase` で migrations・functions を管理でき、コマンドが CLAUDE.md §8 にある |
 | T-005 | DBマイグレーション（全テーブル・インデックス・CHECK・RLS・ユーザー初期化トリガー・シード） | O | ✅ マイグレーション・テスト・型生成（`npm run gen:types`） | 空のDBに適用でき、他人のデータが読めないことを確認済み。型を生成できる |
 | T-006 | Next.js 雛形（`app/`）：TS・Tailwind・ESLint・Supabase クライアント・ログイン・共通レイアウト | O | ✅ Next.js 16・メールとパスワードでログイン（Google ログインはステップ6） | ログイン→ホーム表示→ログアウトができる。`npm run build` が通る。コマンドが CLAUDE.md §8 にある |
 | T-007 | CI（GitHub Actions）：app の lint・型チェック・ビルド、egg の `pio run`、chicken の構文チェック | S | ✅ DB テストも実行 | PR ごとに自動実行される |
@@ -243,7 +243,7 @@ Docker Desktop を起動してから、それぞれ別のターミナルで：
 | T-202 | `device-sync` | S | ✅ ステップ2で前倒し | 鶏が次のアラーム時刻と進行中セッションを取得できる |
 | T-203 | 起床処理＋ `morning-summary`（スコア算出§6・Gemini コメント） | O | ✅ コメントは Gemini で作り、使えないときは定型文（10/16） | `charge_start` 受信でセッションが完了し、スコアとにわとりのコメントが保存される |
 | T-204 | `chat`（テキスト会話） | S | ✅ 睡眠の情報・今夜の提案・直近10件を Gemini に渡す。1人1時間30回まで（10/16） | 睡眠データを踏まえたにわとり口調の返答が返り、`chat_messages` に保存される。API障害時は定型文を返す |
-| T-205 | Google カレンダー連携（OAuth・トークン保存・更新） | O | ⬜ | 設定画面から連携/解除でき、翌日の予定を取得できる |
+| T-205 | Google カレンダー連携（OAuth・トークン保存・更新） | O | 🟡 コードは完了（10/17、`aryu-calendar`）。田村さんが Google Cloud で OAuth クライアントを作り、値を入れたら本物の Google で確認する（`docs/cloud-setup.md` §3） | 設定画面から連携/解除でき、翌日の予定を取得できる |
 | T-206 | `evening-suggestion` と19:00の定期実行 | S | ✅ 提案の計算・理由文（Gemini）・19時の定期実行。鶏が話す内容は device-sync の `announcements`、声は `speak`（10/16） | 推奨就寝時刻と理由文が `sleep_recommendations` に保存される |
 | T-207 | `voice-chat`（音声会話）：録音を Gemini に送り、聞き取りと返事を1回で作り、Gemini の TTS で音声にする（キャラボイスで声を変える） | O | ✅ 録音は保存しない。Gemini の待ち時間は1モデル20秒（10/16） | 鶏から送った録音に対して音声の返答が返る。聞き取れない・API 障害のときは定型の返答（`fallback: true`） |
 | T-208 | ~~会話音声の Storage 保存と保持期間~~ → 録音は保存しない（Q7）。`chat_messages.audio_url` は使わない | — | ✅ 不要になった（2026-10-16） | 録音がサーバーに残らない（voice-chat の中で使い捨てる） |
@@ -327,6 +327,7 @@ Docker Desktop を起動してから、それぞれ別のターミナルで：
 | 2026-10-17 | いびき・寝言はたまごのマイク（Audio Level）だけで判定する。鶏のマイクはボタンで話すときの録音だけに使う | 鶏のマイクを開いたままにすると、会話の録音とぶつかるため。api-spec §6-2 もたまごの音量が中心 |
 | 2026-10-17 | 充電検知は、たまごが一定時間（`DOCK_DEBOUNCE_MS`）同じ状態で確定し、Dock の値を Read でも読めるようにする。鶏はつないだときと15秒ごとに Read して取りこぼしを補う（BLE の形式は変えない） | Issue #5。Notify だけだと、BLE が切れていたあいだの変化を取りこぼすため |
 | 2026-10-17 | たまごのバッテリー残量は BLE 標準の Battery Service で送る（配線が決まったら有効にする） | ble-protocol を大きく変えずに追加できるため |
+| 2026-10-17 | カレンダー連携（T-205）：Google の権限は読み取りだけ。起きる時刻＝「次のアラーム」と「明日の最初の予定 − 90分」の早いほう。予定のほうが早ければ理由文でアラームを早めるようすすめる（自動では変えない）。予定の名前は Gemini に送らない。ログインはメールとパスワードのままで、カレンダーだけ連携する（spec-changes A-27・A-28） | 仕様書に予定から起きる時刻を決める方法がなかったため。予定の名前は個人的な内容を含みうるため。Google ログインがなくても連携できるので、ログインの変更は公開の準備で検討する |
 | 2026-09-24 | 開発中はローカルの Supabase（Docker）を使う。クラウドのアカウントは公開・Googleログインが必要になった段階で作る | アカウントなしで叩き台を作り進められるため |
 | 2026-10-09 | 鶏ユニットに5インチDSIディスプレイ（800×480、静電容量タッチ）を追加採用。にわとりの表情（目）表現に使う | 昨年度の余剰部品。Raspberry Pi 3Bで表示動作を実機確認済み（ドライバ不要）。LEDより細かい表情表現ができるため、班全体の合意で採用。筐体の穴あけ（HW担当）とアニメーション描画の実装（未着手）が必要 |
 

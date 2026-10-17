@@ -16,7 +16,8 @@ Next.js は 16 系。書き方に迷ったら、上の AGENTS.md のとおり `n
 | `src/components/` | 画面の枠の部品（`StatusBar`・`Clock`・`BottomNav`・`PhaseDial`・`ErrorView`） |
 | `src/components/ui/` | どの画面でも使う部品：`Switch`（ON/OFF）・`SegmentedControl`（今夜／週間などの切り替え、URL で切り替える）・`ChickenBubble`（にわとりのセリフ）・`Stat`/`StatGrid`（数値のタイル）・`ScoreRing`（スコアの円）・`LogItem`（履歴の1行） |
 | `src/components/device/` | デバイスの部品（`ChickenRegistration`＝鶏の登録・トークンの再発行・交換。登録は `src/app/(main)/device/actions.ts`） |
-| `src/components/settings/` | 設定の部品（`AlarmSettings`＝アラームの一覧・編集、`NotificationSettings`＝通知の ON/OFF とキャラボイス。保存は `src/app/(main)/settings/actions.ts`） |
+| `src/components/settings/` | 設定の部品（`AlarmSettings`＝アラームの一覧・編集、`NotificationSettings`＝通知の ON/OFF とキャラボイス、`CalendarSettings`＝Google カレンダー連携。保存は `src/app/(main)/settings/actions.ts`） |
+| `src/lib/calendar.ts`・`src/app/(main)/settings/calendar/callback/` | カレンダー連携（T-205）。Edge Function `calendar-connect` を呼ぶ。Google から戻る URL は `/settings/calendar/callback`（ローカルは **`localhost:3000`** で開く。`127.0.0.1` だと Google に登録した戻り先と合わない） |
 | `src/components/charts/` | グラフ（`EventTimeline`＝寝返り・いびきのタイムライン、`LineChart`＝折れ線、`ScoreBars`＝週間スコアの棒。触れるとその値が出る）。軸の計算は `src/lib/chart.ts` |
 | `src/components/chat/` | にわとりとのチャット（`ChatPanel`。`supabase.functions.invoke("chat")` で送る。ページは `src/app/(main)/chat/`） |
 | `src/components/records/` | 記録の部品（`NightRecordView`＝1晩の記録、`WeekView`＝週間。データは `src/lib/data/night.ts`・`week.ts`） |

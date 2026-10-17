@@ -351,12 +351,16 @@ await supabase.functions.invoke("morning-summary", { body: { session_id: "…" }
 
 - 毎日19:00（日本時間）に、サーバーの定期実行が secret キーで呼び、全ユーザーぶん作る（応答は `{ created, skipped, failed }`）。
 - Webアプリから呼ぶと、ログイン中のユーザーの分だけ作り直す（デモ用。デバイスシミュレーターにボタンあり）。
-- 計算：起きる時刻＝24時間以内の次のアラーム（なければ作らず `recommendation: null`）。推奨就寝時刻＝起きる時刻 − 7時間半 − 寝つくまでの時間（直近7晩の平均、10〜60分。記録がなければ15分）。理由文は Gemini（使えなければ定型文）。カレンダーの予定（`first_event_*`）は T-205 で足す。
+- 計算：起きる時刻＝「24時間以内の次のアラーム」と「明日の最初の予定の開始 − 90分」（カレンダー連携しているとき、§4-7）の早いほう。どちらもなければ作らず `recommendation: null`。推奨就寝時刻＝起きる時刻 − 7時間半 − 寝つくまでの時間（直近7晩の平均、10〜60分。記録がなければ15分）。理由文は Gemini（使えなければ定型文）。
+- 予定に合わせるとアラームより早く起きる必要があるときは、理由文で「アラームを早める」ようすすめる（アラームは自動では変えない）。
+- 「明日の最初の予定」：起きる日（日本時間）の主カレンダーの予定のうち、今より後に始まる最初のもの。終日の予定・取り消された予定・自分が不参加にした予定は除く。`first_event_title`・`first_event_start` に保存する（予定がなければ null）。**予定の名前は Gemini に送らない**（時刻だけ）。
+- カレンダーが読めない（連携が切れた・Google に届かない）ときは、アラームだけで作る。
 - 起きる日（`target_date`）ごとに1件。作り直すと上書きする。
 
 ```ts
 const { data } = await supabase.functions.invoke("evening-suggestion", { body: {} });
-// data: { recommendation: { target_date, recommended_bedtime, recommended_wake_time, required_sleep_minutes, reasoning } }
+// data: { recommendation: { target_date, recommended_bedtime, recommended_wake_time, required_sleep_minutes,
+//                          first_event_title, first_event_start, reasoning } }
 ```
 
 ### 4-6. Realtime（画面の自動更新）
@@ -368,6 +372,21 @@ const { data } = await supabase.functions.invoke("evening-suggestion", { body: {
 | にわとりチャット | `chat_messages` | `chat_session_id=eq.<会話ID>` |
 
 ---
+
+### 4-7. `POST calendar-connect` — Google カレンダー連携（T-205）
+
+Webアプリ（ログインしたユーザー）が呼ぶ。トークンはサーバーの `google_credentials` にだけ保存し、Webアプリには返さない。読むのは予定だけ（スコープ `calendar.readonly`）。
+
+| `action` | 本文 | 応答 |
+|---|---|---|
+| `start` | `{ action, redirect_uri }` | `{ url }`：Google の同意画面。Webアプリはそこへ移る（state を保存。10分で無効） |
+| `finish` | `{ action, code, state, redirect_uri }` | `{ connected: true }`：同意画面から戻ってきた `code` をトークンに換えて保存する（state は1回だけ使える） |
+| `disconnect` | `{ action }` | `{ connected: false }`：Google 側でも取り消して、トークンを消す |
+
+- `redirect_uri` は Webアプリの `/settings/calendar/callback`。関数の環境変数 `GOOGLE_REDIRECT_URIS`（カンマ区切り。既定は `http://localhost:3000/settings/calendar/callback`）にあるものだけ受け付ける。Google Cloud の「承認済みのリダイレクト URI」にも同じものを登録する。
+- エラーの `code`：`not_configured`（503。`GOOGLE_CLIENT_ID`・`GOOGLE_CLIENT_SECRET` がない）、`invalid_redirect_uri`、`invalid_state`（期限切れ・使用済み・他人の state）、`google_error`（Google がトークンを出さなかった）、`scope_missing`（同意画面でカレンダーのチェックを外した）、`no_refresh_token`。
+- 連携しているかは RPC `calendar_status()`（`{ connected, connected_at }`）で読む。
+- refresh token が使えなくなったら（取り消された・**Google Cloud のアプリが「テスト中」の間は7日で切れる**）、サーバーが連携を消す。設定画面は「連携していない」に戻るので、もう一度連携する。
 
 ## 5. サーバー内部の処理
 
@@ -416,7 +435,8 @@ API を実装するために、次の変更を加える（`server/supabase/migra
 | 計測系6テーブル | 「デバイス＋時刻＋種類」の一意制約 | 再送時の重複を防ぐため |
 | `sleep_recommendations` | `recommended_wake_time`・`first_event_title`・`first_event_start` を追加 | 夕方確認の画面に「明日の予定」と「起きる時刻」を出すため |
 | `chat_sessions` | `trigger` に `'app'`（Webアプリのテキスト会話）を追加 | |
-| （T-205で追加予定） | `google_credentials`：カレンダー用のトークン | |
+| `google_credentials`（新規、T-205） | カレンダーのトークン。クライアントからは読めない（RPC `calendar_status()` で連携の有無だけ読める） | カレンダー連携（§4-7） |
+| `oauth_states`（新規、T-205） | OAuth の state（10分で無効、1回だけ使える）。クライアントからは読めない | 同意画面から戻ってきたのが本人の操作か確かめるため |
 
 ---
 

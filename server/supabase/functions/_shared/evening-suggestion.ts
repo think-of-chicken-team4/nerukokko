@@ -1,8 +1,10 @@
 // 夕方の就寝提案を作って保存する（T-206）。evening-suggestion（定期実行・Webアプリ）から呼ぶ。
 
+import { loadFirstEvent } from "./calendar-store.ts";
 import { toOneParagraph } from "./comment.ts";
 import { eveningPrompt, eveningTemplate, planEvening } from "./evening.ts";
 import { generateText } from "./gemini.ts";
+import { calendarTargetDate } from "./google-calendar.ts";
 import type { Db } from "./http.ts";
 
 /** 寝つくまでの時間の平均に使う夜の数 */
@@ -13,10 +15,12 @@ export type Recommendation = {
   recommended_bedtime: string;
   recommended_wake_time: string | null;
   required_sleep_minutes: number;
+  first_event_title: string | null;
+  first_event_start: string | null;
   reasoning: string | null;
 };
 
-/** そのユーザーの今夜の提案を作って保存する。アラームがなければ作らない（null） */
+/** そのユーザーの今夜の提案を作って保存する。アラームも明日の予定もなければ作らない（null） */
 export async function runEveningSuggestion(db: Db, userId: string, now: Date = new Date()): Promise<Recommendation | null> {
   const [alarm, recent, profile] = await Promise.all([
     db.rpc("next_alarm_at", { p_user_id: userId, p_from: now.toISOString() }).maybeSingle(),
@@ -38,7 +42,10 @@ export async function runEveningSuggestion(db: Db, userId: string, now: Date = n
       ?.onset_latency_min;
     return typeof latency === "number" ? [latency] : [];
   });
-  const plan = planEvening(now, alarm.data?.ring_at ? new Date(alarm.data.ring_at) : null, latencies);
+  const nextAlarm = alarm.data?.ring_at ? new Date(alarm.data.ring_at) : null;
+  // カレンダー連携していれば、明日の最初の予定も見る（していなければ null）
+  const firstEvent = await loadFirstEvent(db, userId, calendarTargetDate(now, nextAlarm), now);
+  const plan = planEvening(now, nextAlarm, latencies, firstEvent);
   if (!plan) return null;
 
   const generated = await generateText({ ...eveningPrompt(plan, profile.data?.display_name ?? ""), maxOutputTokens: 200 });
@@ -50,13 +57,17 @@ export async function runEveningSuggestion(db: Db, userId: string, now: Date = n
     recommended_bedtime: plan.bedtime.toISOString(),
     recommended_wake_time: plan.wake.toISOString(),
     required_sleep_minutes: plan.requiredSleepMin,
+    first_event_title: plan.event?.title ?? null,
+    first_event_start: plan.event?.start.toISOString() ?? null,
     reasoning,
     generated_at: now.toISOString(),
   };
   const { data, error } = await db
     .from("sleep_recommendations")
     .upsert(row, { onConflict: "user_id,target_date" })
-    .select("target_date, recommended_bedtime, recommended_wake_time, required_sleep_minutes, reasoning")
+    .select(
+      "target_date, recommended_bedtime, recommended_wake_time, required_sleep_minutes, first_event_title, first_event_start, reasoning",
+    )
     .single();
   if (error) throw new Error(error.message);
   return data;

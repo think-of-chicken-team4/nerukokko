@@ -186,14 +186,32 @@ await as("anon");
 await expectError("未ログイン（anon）はデバイス登録できない", () =>
   db.query(`select * from public.register_device('chicken', 'B8:27:EB:00:00:01')`), /permission denied/);
 
+console.log("9b. カレンダー連携（google_credentials・calendar_status）");
+await db.exec("reset role");
+await db.query(`insert into public.google_credentials (user_id, refresh_token) values ($1, 'rt-secret')`, [U1]);
+await as("authenticated", U1);
+await expectError("google_credentials はクライアントから読めない", () => db.query(`select * from public.google_credentials`), /permission denied/);
+await expectError("oauth_states はクライアントから読めない", () => db.query(`select * from public.oauth_states`), /permission denied/);
+{
+  const r = await db.query(`select * from public.calendar_status()`);
+  r.rows[0]?.connected === true && r.rows[0]?.connected_at ? ok("本人は「つながっている」とわかる") : ng("calendar_status", JSON.stringify(r.rows));
+}
+await as("authenticated", U2);
+{
+  const r = await db.query(`select * from public.calendar_status()`);
+  r.rows[0]?.connected === false && r.rows[0]?.connected_at === null ? ok("他人の連携は見えない（false）") : ng("calendar_status 他人", JSON.stringify(r.rows));
+}
+await as("anon");
+await expectError("未ログインは calendar_status を呼べない", () => db.query(`select * from public.calendar_status()`), /permission denied/);
+
 console.log("10. ユーザー削除");
 await db.exec("reset role");
 await expectOk("auth.users を消すと関連データも消える", () => db.query(`delete from auth.users where id = $1`, [U1]));
 {
   const r = await db.query(`select (select count(*) from public.devices)::int as d, (select count(*) from public.sleep_sessions)::int as s,
-                                   (select count(*) from public.device_tokens)::int as t, (select count(*) from public.charge_events)::int as c`);
+                                   (select count(*) from public.device_tokens)::int as t, (select count(*) from public.charge_events)::int as c, (select count(*) from public.google_credentials)::int as g`);
   const c = r.rows[0];
-  c.d === 0 && c.s === 0 && c.t === 0 && c.c === 0 ? ok("devices・sessions・tokens・charge_events が残らない") : ng("カスケード", JSON.stringify(c));
+  c.d === 0 && c.s === 0 && c.t === 0 && c.c === 0 && c.g === 0 ? ok("devices・sessions・tokens・charge_events・google_credentials が残らない") : ng("カスケード", JSON.stringify(c));
 }
 
 console.log(failures === 0 ? "\n結果：すべて成功" : `\n結果：${failures} 件失敗`);
