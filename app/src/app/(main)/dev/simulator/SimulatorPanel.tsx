@@ -7,9 +7,14 @@ import { callDeviceApi } from "@/lib/device-api";
 import { formatTime } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
 
-// 仮想の鶏・たまごの MAC アドレス（先頭 02 は「ローカルで決めたアドレス」を表す）
-const CHICKEN_MAC = "02:00:00:00:00:01";
-const EGG_MAC = "02:00:00:00:00:02";
+/**
+ * 仮想の鶏・たまごの MAC アドレス（先頭 02 は「ローカルで決めたアドレス」を表す）。
+ * MAC は全ユーザーで1台にしか登録できないので、アカウントごとに変える（ユーザー ID の先頭から作る）
+ */
+function virtualMac(userId: string, last: "01" | "02"): string {
+  const hex = userId.replace(/-/g, "").slice(0, 8).toUpperCase().padEnd(8, "0");
+  return ["02", ...(hex.match(/../g) ?? []), last].join(":");
+}
 const FIRMWARE = "simulator-0.1";
 const AUTO_INTERVAL_MS = 3000;
 
@@ -20,23 +25,23 @@ const rand = (min: number, max: number) => min + Math.random() * (max - min);
 const round1 = (value: number) => Math.round(value * 10) / 10;
 const nowIso = () => new Date().toISOString();
 
-// ---------- デバイストークンの保存（このブラウザの localStorage） ----------
-const TOKEN_STORAGE_KEY = "nerukokko-simulator-device-token";
+// ---------- デバイストークンの保存（このブラウザの localStorage。アカウントごと） ----------
+const tokenKey = (userId: string) => `nerukokko-simulator-device-token:${userId}`;
 const tokenListeners = new Set<() => void>();
-let tokenInMemory: string | null = null; // localStorage が使えないときの予備
+const tokensInMemory = new Map<string, string>(); // localStorage が使えないときの予備
 
-function readToken(): string | null {
+function readToken(userId: string): string | null {
   try {
-    return localStorage.getItem(TOKEN_STORAGE_KEY) ?? tokenInMemory;
+    return localStorage.getItem(tokenKey(userId)) ?? tokensInMemory.get(userId) ?? null;
   } catch {
-    return tokenInMemory;
+    return tokensInMemory.get(userId) ?? null;
   }
 }
 
-function saveToken(token: string) {
-  tokenInMemory = token;
+function saveToken(userId: string, token: string) {
+  tokensInMemory.set(userId, token);
   try {
-    localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    localStorage.setItem(tokenKey(userId), token);
   } catch {
     // 保存できなくても、この画面を開いている間は使える
   }
@@ -92,10 +97,44 @@ function buildNight(start: Date, end: Date): Payload {
   return { environment, breathing, motion_events, audio_events, presence_events };
 }
 
+/** 一晩分のデータを、計測時刻で区切って分ける（デモの早回しで、1時間ずつ順に送るため） */
+function splitByTime(night: Payload, start: Date, end: Date, parts: number): Payload[] {
+  const step = (end.getTime() - start.getTime()) / parts;
+  return Array.from({ length: parts }, (_, i) => {
+    const from = start.getTime() + step * i;
+    const to = i === parts - 1 ? Infinity : from + step;
+    return Object.fromEntries(
+      Object.entries(night).map(([key, items]) => [
+        key,
+        (items as { timestamp: string }[]).filter((item) => {
+          const t = new Date(item.timestamp).getTime();
+          return t >= from && t < to;
+        }),
+      ]),
+    );
+  });
+}
+
+/** デモの1場面の長さ（ミリ秒）。発表では、場面ごとにスマホの画面を見せながら話す */
+const DEMO_SPEEDS = [
+  { label: "ゆっくり（1場面 8秒）", ms: 8000 },
+  { label: "ふつう（4秒）", ms: 4000 },
+  { label: "はやい（1.5秒）", ms: 1500 },
+] as const;
+/** 一晩を何回に分けて送るか（1時間ずつ） */
+const DEMO_NIGHT_PARTS = 8;
+/** デモの一晩として最低限ほしい長さ（これより短いと始めない） */
+const DEMO_MIN_NIGHT_MS = 2 * 3600_000;
+
+class DemoStopped extends Error {}
+class DemoFailed extends Error {}
+
 export function SimulatorPanel({ userId, initialSession }: { userId: string; initialSession: ActiveSession | null }) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
-  const token = useSyncExternalStore(subscribeToken, readToken, () => null);
+  const token = useSyncExternalStore(subscribeToken, () => readToken(userId), () => null);
+  const chickenMac = virtualMac(userId, "01");
+  const eggMac = virtualMac(userId, "02");
   const [session, setSession] = useState<ActiveSession | null>(initialSession);
   const [logs, setLogs] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -103,6 +142,9 @@ export function SimulatorPanel({ userId, initialSession }: { userId: string; ini
   // たまごが巣にあるか。本物の鶏は Dock Event で知り、device-sync で報告する（ホームの就寝準備・デバイス画面に出る）
   const [docked, setDocked] = useState(true);
   const tick = useRef(0);
+  const [demoStep, setDemoStep] = useState<string | null>(null);
+  const [demoSpeed, setDemoSpeed] = useState(1);
+  const demoStop = useRef(false);
 
   const log = useCallback((message: string) => {
     setLogs((prev) => [`${formatTime(new Date())}  ${message}`, ...prev].slice(0, 30));
@@ -117,23 +159,23 @@ export function SimulatorPanel({ userId, initialSession }: { userId: string; ini
     setSession(data);
   }, [supabase]);
 
-  /** 鶏として ingest-sensor-data に送り、結果をログに出す */
+  /** 鶏として ingest-sensor-data に送り、結果をログに出す。受け付けられたら true */
   const send = useCallback(
-    async (label: string, items: Payload) => {
-      if (!token) {
+    async (label: string, items: Payload, deviceToken: string | null = token): Promise<boolean> => {
+      if (!deviceToken) {
         log("先に「仮想の鶏・たまごを登録」を押してください");
-        return;
+        return false;
       }
-      const { status, body } = await callDeviceApi("ingest-sensor-data", token, {
+      const { status, body } = await callDeviceApi("ingest-sensor-data", deviceToken, {
         sent_at: nowIso(),
         firmware_version: FIRMWARE,
-        egg: { mac_address: EGG_MAC, firmware_version: FIRMWARE, battery_level: Math.round(rand(60, 95)) },
+        egg: { mac_address: eggMac, firmware_version: FIRMWARE, battery_level: Math.round(rand(60, 95)) },
         ...items,
       });
       const result = body as { accepted?: Record<string, number>; skipped?: { reason: string }[]; error?: { message: string } };
       if (status !== 200) {
         log(`${label}：失敗（${status}）${result.error?.message ?? ""}`);
-        return;
+        return false;
       }
       const accepted = Object.entries(result.accepted ?? {})
         .filter(([, n]) => n > 0)
@@ -141,8 +183,9 @@ export function SimulatorPanel({ userId, initialSession }: { userId: string; ini
         .join("・");
       const skipped = result.skipped?.length ? ` ／ スキップ ${result.skipped.length}件（${result.skipped[0].reason} など）` : "";
       log(`${label}：受付 ${accepted || "なし"}${skipped}`);
+      return true;
     },
-    [token, log],
+    [token, log, eggMac],
   );
 
   /** ボタンの処理を実行し、終わったら記録中のセッションと画面を読み直す */
@@ -157,53 +200,63 @@ export function SimulatorPanel({ userId, initialSession }: { userId: string; ini
     }
   }
 
-  const registerDevices = () =>
-    runTask(async () => {
-      const { data, error } = await supabase
-        .rpc("register_device", { p_type: "chicken", p_mac_address: CHICKEN_MAC, p_firmware_version: FIRMWARE })
-        .single();
-      if (error || !data?.device_token) {
-        log(`登録に失敗しました：${error?.message ?? "トークンがありません"}`);
-        return;
-      }
-      saveToken(data.device_token);
-      // たまごは、鶏が最初に状態を報告したときに自動で登録される
-      await callDeviceApi("device-sync", data.device_token, {
-        firmware_version: FIRMWARE,
-        egg_mac_address: EGG_MAC,
-        status: { egg_connected: true, egg_docked: true, egg_battery_level: 90 },
-      });
-      setDocked(true);
-      log("仮想の鶏・たまごを登録しました");
+  /** 仮想の鶏を登録してトークンを保存する。できなければ null */
+  const doRegister = async (): Promise<string | null> => {
+    const { data, error } = await supabase
+      .rpc("register_device", { p_type: "chicken", p_mac_address: chickenMac, p_firmware_version: FIRMWARE })
+      .single();
+    if (error || !data?.device_token) {
+      log(`登録に失敗しました：${error?.message ?? "トークンがありません"}`);
+      return null;
+    }
+    saveToken(userId, data.device_token);
+    // たまごは、鶏が最初に状態を報告したときに自動で登録される
+    await callDeviceApi("device-sync", data.device_token, {
+      firmware_version: FIRMWARE,
+      egg_mac_address: eggMac,
+      status: { egg_connected: true, egg_docked: true, egg_battery_level: 90 },
     });
+    setDocked(true);
+    log("仮想の鶏・たまごを登録しました");
+    return data.device_token;
+  };
+  const registerDevices = () => runTask(async () => void (await doRegister()));
 
-  const startSession = (hoursAgo: number) =>
-    runTask(async () => {
-      const now = Date.now();
-      let start = new Date(now - hoursAgo * 3600_000);
-      // 前の記録と期間が重なると、計測データが前の記録に入ってしまうので、前の記録が終わった後から始める
-      const { data: last } = await supabase
-        .from("sleep_sessions")
-        .select("end_time")
-        .not("end_time", "is", null)
-        .order("end_time", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (last?.end_time && new Date(last.end_time) >= start) {
-        start = new Date(new Date(last.end_time).getTime() + 60_000);
-        log(`前の記録と重ならないよう、就寝を ${formatTime(start)} にしました`);
-      }
-      // 早送り用（何時間も前に寝た）なら、起床予定は2分後にして「睡眠記録」のまま一晩分を送れるようにする
-      const plannedWake = new Date(hoursAgo > 0 ? now + 2 * 60_000 : now + 8 * 3600_000);
-      const { error } = await supabase.from("sleep_sessions").insert({
-        user_id: userId,
-        start_time: start.toISOString(),
-        planned_wake_time: plannedWake.toISOString(),
-      });
-      log(error ? `睡眠を始められませんでした：${error.message}` : `睡眠を開始（就寝 ${formatTime(start)}）`);
-    });
+  /** いちばん最近に終わった記録の終わりの時刻 */
+  const lastEndTime = async (): Promise<Date | null> => {
+    const { data } = await supabase
+      .from("sleep_sessions")
+      .select("end_time")
+      .not("end_time", "is", null)
+      .order("end_time", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return data?.end_time ? new Date(data.end_time) : null;
+  };
 
-  const sendNow = (label: string, build: () => Payload) => runTask(() => send(label, build()));
+  /** 睡眠を始める（hoursAgo 時間前に寝たことにもできる）。始めた記録を返す */
+  const doStartSession = async (hoursAgo: number): Promise<ActiveSession | null> => {
+    const now = Date.now();
+    let start = new Date(now - hoursAgo * 3600_000);
+    // 前の記録と期間が重なると、計測データが前の記録に入ってしまうので、前の記録が終わった後から始める
+    const lastEnd = await lastEndTime();
+    if (lastEnd && lastEnd >= start) {
+      start = new Date(lastEnd.getTime() + 60_000);
+      log(`前の記録と重ならないよう、就寝を ${formatTime(start)} にしました`);
+    }
+    // 早送り用（何時間も前に寝た）なら、起床予定は2分後にして「睡眠記録」のまま一晩分を送れるようにする
+    const plannedWake = new Date(hoursAgo > 0 ? now + 2 * 60_000 : now + 8 * 3600_000);
+    const { data, error } = await supabase
+      .from("sleep_sessions")
+      .insert({ user_id: userId, start_time: start.toISOString(), planned_wake_time: plannedWake.toISOString() })
+      .select("id, start_time, planned_wake_time")
+      .single();
+    log(error ? `睡眠を始められませんでした：${error.message}` : `睡眠を開始（就寝 ${formatTime(start)}）`);
+    return data;
+  };
+  const startSession = (hoursAgo: number) => runTask(async () => void (await doStartSession(hoursAgo)));
+
+  const sendNow = (label: string, build: () => Payload) => runTask(async () => void (await send(label, build())));
 
   const sendNight = () =>
     runTask(async () => {
@@ -216,39 +269,119 @@ export function SimulatorPanel({ userId, initialSession }: { userId: string; ini
 
   /** 鶏と同じように、今の状態（たまごが巣にあるか など）を device-sync で報告する */
   const reportStatus = useCallback(
-    (eggDocked: boolean) =>
-      callDeviceApi("device-sync", token!, {
+    (eggDocked: boolean, deviceToken: string | null = token) =>
+      callDeviceApi("device-sync", deviceToken!, {
         firmware_version: FIRMWARE,
-        egg_mac_address: EGG_MAC,
+        egg_mac_address: eggMac,
         status: { alarm_ringing: false, egg_connected: true, egg_docked: eggDocked, egg_battery_level: 88, temperature_c: 24.2 },
       }),
-    [token],
+    [token, eggMac],
   );
 
   /** 巣から取り出す・巣に戻す：充電イベントを送り、鶏と同じようにすぐ状態も報告する */
-  const moveEgg = (toNest: boolean) =>
-    runTask(async () => {
-      await send(toNest ? "巣に戻す（起床）" : "巣から取り出す", chargeNow(toNest ? "charge_start" : "charge_stop")());
-      setDocked(toNest);
-      if (token) await reportStatus(toNest);
-    });
+  const doMoveEgg = async (toNest: boolean, deviceToken: string | null = token): Promise<boolean> => {
+    const ok = await send(toNest ? "巣に戻す（起床）" : "巣から取り出す", chargeNow(toNest ? "charge_start" : "charge_stop")(), deviceToken);
+    if (!ok) return false;
+    setDocked(toNest);
+    if (deviceToken) await reportStatus(toNest, deviceToken);
+    return true;
+  };
+  const moveEgg = (toNest: boolean) => runTask(async () => void (await doMoveEgg(toNest)));
 
   /** 夕方の就寝提案を、19時を待たずに今すぐ作る（デモ用。evening-suggestion をログイン中のユーザーとして呼ぶ） */
-  const makeSuggestion = () =>
-    runTask(async () => {
-      const { data, error } = await supabase.functions.invoke<{
-        recommendation: { recommended_bedtime: string } | null;
-      }>("evening-suggestion", { body: {} });
-      if (error) {
-        log(`就寝提案：失敗（${error.message}）`);
+  const doSuggestion = async () => {
+    const { data, error } = await supabase.functions.invoke<{
+      recommendation: { recommended_bedtime: string } | null;
+    }>("evening-suggestion", { body: {} });
+    if (error) {
+      log(`就寝提案：失敗（${error.message}）`);
+      return;
+    }
+    log(
+      data?.recommendation
+        ? `就寝提案：${formatTime(data.recommendation.recommended_bedtime)} までに寝る（ホームの夕方確認に出ます）`
+        : "就寝提案：24時間以内のアラームも明日の予定もないので作りませんでした（設定でアラームを入れてください）",
+    );
+  };
+  const makeSuggestion = () => runTask(doSuggestion);
+
+  /**
+   * 発表用デモ（T-305）：夕方の提案 → 就寝準備 → 眠る → 一晩を早回し → 起床 を、場面ごとに間をあけて自動で進める。
+   * 別の端末（スマホ）でホームを開いておくと、Realtime で画面が切り替わっていく。
+   */
+  const runDemo = async () => {
+    const pause = DEMO_SPEEDS[demoSpeed].ms;
+    const wait = async (ms: number) => {
+      const until = Date.now() + ms;
+      while (Date.now() < until) {
+        if (demoStop.current) throw new DemoStopped();
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+    };
+    const scene = async (label: string, task: () => Promise<boolean | void>) => {
+      if (demoStop.current) throw new DemoStopped();
+      setDemoStep(label);
+      log(`🎬 ${label}`);
+      if ((await task()) === false) throw new DemoFailed(label);
+      await loadSession();
+      router.refresh();
+      await wait(pause);
+    };
+
+    demoStop.current = false;
+    setBusy(true);
+    try {
+      // 保存してあるトークンが使えるか確かめる（DB を作り直した・実機の鶏を登録したなどで使えなくなっていれば登録し直す）
+      let deviceToken = token;
+      if (deviceToken && (await reportStatus(docked, deviceToken)).status === 401) deviceToken = null;
+      if (!deviceToken) deviceToken = await doRegister();
+      if (!deviceToken) return;
+      if (session) {
+        log("記録中の睡眠があるので、先に「巣に戻す（起床）」で終わらせてください");
         return;
       }
-      log(
-        data?.recommendation
-          ? `就寝提案：${formatTime(data.recommendation.recommended_bedtime)} までに寝る（ホームの夕方確認に出ます）`
-          : "就寝提案：24時間以内のアラームも明日の予定もないので作りませんでした（設定でアラームを入れてください）",
-      );
-    });
+      // 一晩は「前の記録の終わり」より後にしか置けない。短すぎると何も記録されないので始めない
+      const lastEnd = await lastEndTime();
+      if (lastEnd && Date.now() - lastEnd.getTime() < DEMO_MIN_NIGHT_MS) {
+        log(
+          `🎬 前の記録が ${formatTime(lastEnd)} に終わったばかりで、一晩分の時間が取れません。新しいアカウントで再生してください（ローカルなら npx supabase db reset でも可）`,
+        );
+        return;
+      }
+      await scene("夕方：にわとりが今夜の就寝時刻を提案", doSuggestion);
+      await scene("就寝準備：たまごを巣から取り出す", () => doMoveEgg(false, deviceToken));
+      let night: ActiveSession | null = null;
+      await scene("就寝：眠りにつく（8時間前に寝たことにする）", async () => {
+        night = await doStartSession(8);
+        return night !== null;
+      });
+      const start = new Date((night as ActiveSession | null)!.start_time);
+      const end = new Date(Date.now() - 30_000);
+      if (end.getTime() - start.getTime() < 7 * 3600_000) {
+        log("⚠ 前の記録と重ならないよう就寝を遅らせたので、一晩が短くなっています（デモ用のアカウントは1日1回の再生がおすすめ）");
+      }
+      const parts = splitByTime(buildNight(start, end), start, end, DEMO_NIGHT_PARTS);
+      for (const [i, part] of parts.entries()) {
+        if (demoStop.current) throw new DemoStopped();
+        setDemoStep(`睡眠中：一晩を早回し（${i + 1}/${parts.length}）`);
+        if (!(await send(`一晩の${i + 1}/${parts.length}`, part, deviceToken))) throw new DemoFailed("一晩の早回し");
+        router.refresh();
+        await wait(Math.max(800, pause / 4));
+      }
+      await wait(pause);
+      await scene("起床：たまごを巣に戻す → 朝のスコア", () => doMoveEgg(true, deviceToken));
+      log("🎬 デモが終わりました。ホームに朝のスコアとにわとりのコメントが出ます");
+    } catch (e) {
+      if (e instanceof DemoFailed) log(`🎬 「${e.message}」でうまくいかなかったので止めました（上のログを確かめてください）`);
+      else if (e instanceof DemoStopped) log("🎬 デモを止めました（記録中の睡眠は「巣に戻す（起床）」で終わらせられます）");
+      else throw e;
+    } finally {
+      setDemoStep(null);
+      setBusy(false);
+      await loadSession();
+      router.refresh();
+    }
+  };
 
   const sync = () =>
     runTask(async () => {
@@ -288,10 +421,49 @@ export function SimulatorPanel({ userId, initialSession }: { userId: string; ini
       </div>
 
       <div className="card">
+        <h2 className="card-title">🎬 発表用デモ（1日の流れを自動で再生）</h2>
+        <p className="muted mb-1">
+          夕方の提案 → たまごを取り出す → 眠る → 一晩を早回し（1時間ずつ8回）→ 巣に戻して朝のスコア、までを自動で進めます。
+          スマホなど別の画面でホームを開いておくと、場面ごとに切り替わります。アラームを1つ入れておくと夕方の提案も出ます。
+          一晩は「前の記録の終わり」より後に置くので、<strong>1つのアカウントで再生できるのは1日1回</strong>が目安です（リハーサルは別のアカウントで）。
+        </p>
+        <div className="btn-row" role="radiogroup" aria-label="デモの速さ">
+          {DEMO_SPEEDS.map((speed, i) => (
+            <button
+              key={speed.label}
+              type="button"
+              role="radio"
+              aria-checked={demoSpeed === i}
+              className={`btn btn-sm ${demoSpeed === i ? "btn-primary" : "btn-secondary"}`}
+              disabled={!!demoStep}
+              onClick={() => setDemoSpeed(i)}
+            >
+              {speed.label}
+            </button>
+          ))}
+        </div>
+        {demoStep ? (
+          <>
+            <p className="hint" aria-live="polite">
+              ▶ {demoStep}
+            </p>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => (demoStop.current = true)}>
+              止める
+            </button>
+          </>
+        ) : (
+          <button type="button" className="btn btn-primary btn-sm" disabled={busy || !!session} onClick={() => void runDemo()}>
+            ▶ デモを始める
+          </button>
+        )}
+        {session && !demoStep && <p className="muted mt-2">記録中の睡眠があります。先に「4. 巣」の「巣に戻す（起床）」で終わらせてください。</p>}
+      </div>
+
+      <div className="card">
         <h2 className="card-title">🐔 1. 仮想デバイス</h2>
         <div className="row">
           <div>
-            <div className="row-label">鶏 {CHICKEN_MAC}</div>
+            <div className="row-label">鶏 {chickenMac}</div>
             <div className="row-sub">{token ? "登録済み（トークンをこのブラウザに保存）" : "未登録"}</div>
           </div>
           <span className={`pill ${token ? "pill-blue" : "pill-pink"}`}>{token ? "OK" : "未登録"}</span>
