@@ -458,3 +458,51 @@ entrypoint = "./functions/close-stale-sessions/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/close-stale-sessions/*.html" ]
+
+
+[functions.chat]
+enabled = true
+verify_jwt = false
+import_map = "./functions/chat/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/chat/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/chat/*.html" ]
+
+
+[functions.evening-suggestion]
+enabled = true
+verify_jwt = false
+import_map = "./functions/evening-suggestion/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/evening-suggestion/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/evening-suggestion/*.html" ]
+
+
+[functions.speak]
+enabled = true
+verify_jwt = false
+import_map = "./functions/speak/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/speak/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/speak/*.html" ]
+
+
+[functions.voice-chat]
+enabled = true
+verify_jwt = false
+import_map = "./functions/voice-chat/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/voice-chat/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/voice-chat/*.html" ]

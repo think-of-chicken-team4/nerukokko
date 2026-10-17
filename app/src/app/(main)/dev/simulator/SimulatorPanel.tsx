@@ -233,6 +233,23 @@ export function SimulatorPanel({ userId, initialSession }: { userId: string; ini
       if (token) await reportStatus(toNest);
     });
 
+  /** 夕方の就寝提案を、19時を待たずに今すぐ作る（デモ用。evening-suggestion をログイン中のユーザーとして呼ぶ） */
+  const makeSuggestion = () =>
+    runTask(async () => {
+      const { data, error } = await supabase.functions.invoke<{
+        recommendation: { recommended_bedtime: string } | null;
+      }>("evening-suggestion", { body: {} });
+      if (error) {
+        log(`就寝提案：失敗（${error.message}）`);
+        return;
+      }
+      log(
+        data?.recommendation
+          ? `就寝提案：${formatTime(data.recommendation.recommended_bedtime)} までに寝る（ホームの夕方確認に出ます）`
+          : "就寝提案：24時間以内のアラームがないので作りませんでした（設定でアラームを入れてください）",
+      );
+    });
+
   const sync = () =>
     runTask(async () => {
       if (!token) return;
@@ -284,6 +301,9 @@ export function SimulatorPanel({ userId, initialSession }: { userId: string; ini
         </button>
         <button type="button" className="btn btn-secondary btn-sm" disabled={disabled} onClick={sync}>
           状態を報告して次のアラームを受け取る（device-sync）
+        </button>
+        <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={makeSuggestion}>
+          🌙 今夜の就寝提案を作る（evening-suggestion。ふだんは毎日19時）
         </button>
       </div>
 

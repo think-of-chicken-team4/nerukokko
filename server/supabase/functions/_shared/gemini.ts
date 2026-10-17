@@ -33,11 +33,19 @@ export type GeminiOptions = {
   fetchImpl?: typeof fetch;
 };
 
+export type GeminiTurn = { role: "user" | "model"; text: string };
+
 export type GeminiRequest = {
   /** キャラクター設定などの指示 */
   system: string;
   /** 今回のお願い（データを含む） */
   prompt: string;
+  /** それまでの会話（古い順）。チャットで使う */
+  history?: GeminiTurn[];
+  /** 今回のお願いに付ける音声（voice-chat の録音）。base64 */
+  audio?: { mimeType: string; base64: string };
+  /** 返事を JSON にしてほしいときの形（OpenAPI のスキーマ）。返事の文字列を JSON.parse して使う */
+  jsonSchema?: Record<string, unknown>;
   maxOutputTokens?: number;
 };
 
@@ -49,13 +57,13 @@ function env(name: string): string | undefined {
   return deno?.env.get(name);
 }
 
-/** "a, b ,,c" → ["a", "b", "c"]。空なら既定のモデル */
-export function parseModels(value: string | undefined): string[] {
+/** "a, b ,,c" → ["a", "b", "c"]。空なら fallback（既定は文章用のモデル） */
+export function parseModels(value: string | undefined, fallback: string[] = DEFAULT_MODELS): string[] {
   const models = (value ?? "")
     .split(",")
     .map((m) => m.trim())
     .filter((m) => m.length > 0);
-  return models.length > 0 ? models : DEFAULT_MODELS;
+  return models.length > 0 ? models : fallback;
 }
 
 /** 次のモデルで試し直す価値があるエラーか（混雑・回数の上限・サーバー側の障害・モデルがない） */
@@ -94,8 +102,18 @@ export async function generateText(request: GeminiRequest, options: GeminiOption
         headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: request.system }] },
-          contents: [{ role: "user", parts: [{ text: request.prompt }] }],
+          contents: [
+            ...(request.history ?? []).map((turn) => ({ role: turn.role, parts: [{ text: turn.text }] })),
+            {
+              role: "user",
+              parts: [
+                ...(request.audio ? [{ inlineData: { mimeType: request.audio.mimeType, data: request.audio.base64 } }] : []),
+                { text: request.prompt },
+              ],
+            },
+          ],
           generationConfig: {
+            ...(request.jsonSchema ? { responseMimeType: "application/json", responseSchema: request.jsonSchema } : {}),
             maxOutputTokens: request.maxOutputTokens ?? 400,
             thinkingConfig: { thinkingLevel: THINKING_LEVEL[model] ?? DEFAULT_THINKING_LEVEL },
           },

@@ -68,6 +68,9 @@ export function MorningView({ data }: { data: MorningData }) {
         </StatGrid>
       </div>
 
+      <Link href="/chat" className="btn btn-secondary">
+        🐔 にわとりと話す
+      </Link>
       <Link href="/records" className="btn btn-secondary">
         📊 記録をもっと見る
       </Link>
