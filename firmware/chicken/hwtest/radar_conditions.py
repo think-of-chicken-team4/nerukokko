@@ -19,6 +19,7 @@ Enter で開始し、最初の WARMUP_SEC 秒は集計から除く。結果は r
 import argparse
 import csv
 import datetime
+import math
 import re
 import statistics
 import time
@@ -76,15 +77,31 @@ def measure(label, seconds, writer):
     return rows
 
 
+def finite(values):
+    """NaN を除く（ピークが定まらない掃引の peak_std_mm は NaN になる。本番の radar_filter.py も除いてから中央値をとる）"""
+    return [v for v in values if not math.isnan(v)]
+
+
+def median_text(values, fmt):
+    return format(statistics.median(values), fmt) if values else "なし"
+
+
 def summarize(label, rows):
     if not rows:
         print(f"[{label}] データなし")
         return
     det = [r for r in rows if r["detected"]]
-    q = lambda key: statistics.median([r[key] for r in rows])
+    env_max = finite([r["env_max"] for r in rows])
+    env_at_peak = finite([r["env_at_peak"] for r in rows])
+    stds = finite([r["peak_std_mm"] for r in rows])
     print(f"[{label}] 掃引{len(rows)}件  呼吸検出 {len(det)}/{len(rows)} ({100 * len(det) / len(rows):.0f}%)")
-    print(f"    env_at_peak 中央値 {q('env_at_peak'):8.2f}   env_max 中央値 {q('env_max'):8.2f}")
-    print(f"    peak_std_mm 中央値 {q('peak_std_mm'):8.4f}   peak_idx 中央値 {q('peak_idx'):6.0f}")
+    # RADAR_PRESENCE_ENV_MAX は「人なしの最大」と「人ありの最小」のあいだで決める
+    if env_max:
+        print(f"    env_max     中央値 {median_text(env_max, '8.2f')}   最小 {min(env_max):8.2f}   最大 {max(env_max):8.2f}")
+    print(f"    env_at_peak 中央値 {median_text(env_at_peak, '8.2f')}")
+    # RADAR_BREATHING_STD_MM は「呼吸の中央値」と「息止めの中央値」のあいだで決める
+    print(f"    peak_std_mm 中央値 {median_text(stds, '8.4f')}   （NaN を除く。NaN {len(rows) - len(stds)}件）")
+    print(f"    peak_idx    中央値 {statistics.median([r['peak_idx'] for r in rows]):6.0f}")
     if det:
         bpms = [r["bpm"] for r in det]
         print(f"    BPM 中央値 {statistics.median(bpms):5.1f}  最小 {min(bpms):5.1f}  最大 {max(bpms):5.1f}")
