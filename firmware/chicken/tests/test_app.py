@@ -205,5 +205,64 @@ class ChickenAppIntegrationTest(unittest.TestCase):
         self.assertEqual(item["humidity_pct"], 55.0)
         self.assertEqual(item["illuminance_lux"], 120.0)
 
+    def test_audio_event_is_kept_after_failure_and_removed_after_retry(self):
+        app = ChickenApp.__new__(ChickenApp)
+        app.outbox = Outbox()
+        app.sounds = Mock()
+
+        timestamp = time.time()
+        app.sounds.add.return_value = [
+            SimpleNamespace(
+                timestamp=timestamp,
+                type="snore",
+                duration_ms=850,
+                confidence=0.92,
+            )
+        ]
+
+        # いびきイベントを送信待ちに登録
+        app._on_audio(123)
+        self.assertEqual(app.outbox.count(), 1)
+
+        # 1回目はサーバーエラー、2回目は成功を返す
+        api = Mock()
+        api.ingest.side_effect = [
+            SimpleNamespace(
+                outcome=Outcome.RETRY,
+                status=503,
+                body={},
+            ),
+            SimpleNamespace(
+                outcome=Outcome.OK,
+                status=200,
+                body={"accepted": {}, "skipped": []},
+            ),
+        ]
+
+        uplink = Uplink(app.outbox, api, "test-version", lambda: None)
+        now = time.time()
+
+        # 送信失敗：データは残る
+        self.assertIs(uplink.send(now), Outcome.RETRY)
+        self.assertEqual(app.outbox.count(), 1)
+
+        first_payload = api.ingest.call_args_list[0].args[0]
+
+        # 再送成功：データが削除される
+        self.assertIs(uplink.send(now + 60), Outcome.OK)
+        self.assertEqual(app.outbox.count(), 0)
+
+        second_payload = api.ingest.call_args_list[1].args[0]
+
+        # 再送前後で、計測時刻とイベント内容が変わらない
+        self.assertEqual(
+            first_payload["audio_events"],
+            second_payload["audio_events"],
+        )
+        self.assertEqual(
+            second_payload["audio_events"][0]["type"],
+            "snore",
+        )
+
 if __name__ == "__main__":
     unittest.main()
