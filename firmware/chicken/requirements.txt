@@ -16,5 +16,5 @@ sounddevice>=0.4
 smbus2>=0.4
 # LED（WS2812B）
 rpi_ws281x>=5.0
-# トサカボタン（Raspberry Pi OS には最初から入っていることが多い）
-gpiozero>=2.0
+# 画面（eyes。ラズパイでは apt の python3-pygame でもよい）
+pygame>=2.5

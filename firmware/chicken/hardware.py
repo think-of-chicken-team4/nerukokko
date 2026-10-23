@@ -1,4 +1,4 @@
-"""鶏のハードウェア：LED（WS2812B）・スピーカー・トサカボタン・マイクの録音。
+"""鶏のハードウェア：LED（WS2812B）・スピーカー・マイクの録音。
 
 ライブラリやハードウェアがない環境（Mac・CI・まだ配線していないラズパイ）では、何もしない部品に切り替わる。
 そのため、ラズパイがなくても app.py 全体を動かして確かめられる。
@@ -16,7 +16,7 @@ import subprocess
 import threading
 import time
 import wave
-from typing import Callable, Optional, Tuple
+from typing import Optional, Tuple
 
 import integration_config as config
 
@@ -146,26 +146,11 @@ class Speaker:
                 proc.kill()
 
 
-# ---------------------------------------------------------------- トサカボタン（C7）
-
-
-class Button:
-    def __init__(self, on_press: Callable[[], None]) -> None:
-        self._button = None
-        try:
-            from gpiozero import Button as GpioButton
-
-            self._button = GpioButton(config.BUTTON_PIN, pull_up=True, bounce_time=0.05)
-            self._button.when_pressed = on_press
-        except Exception as error:
-            logger.warning("トサカボタンを使えません（%s）。ボタンなしで続けます", type(error).__name__)
-
-
 # ---------------------------------------------------------------- マイクの録音（SPH0645、C4）
 
 
 class Recorder:
-    """ボタンを押したら録音する。話し終わって MIC_SILENCE_SEC 静かになるか、MIC_MAX_SEC で止める。WAV（16kHz・モノラル・16bit）を返す"""
+    """画面で「話す」をタップしたら録音する。話し終わって MIC_SILENCE_SEC 静かになるか、MIC_MAX_SEC で止める。WAV（16kHz・モノラル・16bit）を返す"""
 
     def record(self) -> Optional[bytes]:
         try:

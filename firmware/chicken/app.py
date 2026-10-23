@@ -4,7 +4,8 @@
     1秒ごと ：アラームを鳴らすか、寝返り・いびき・呼吸・在床の判定、送るタイミングなら ingest-sensor-data
     60秒ごと：温湿度・照度
     たまごが巣に戻ったら：アラームを止め、charge_start をすぐ送る（起床。サーバーが朝の振り返りを作る）
-    トサカボタン：録音 → voice-chat → 返事を流す
+    画面で「話す」をタップ（eyes プロセスから届く）：録音 → voice-chat → 返事を流す
+    0.3秒ごと：状態（表情・会話中・アラーム中）を画面に渡し、画面からの操作を受け取る
 
 docs/api-spec.md §3・§6、docs/ble-protocol.md。設定は integration_config.py（環境変数）。
 """
@@ -25,13 +26,14 @@ from api_client import ApiClient, Outcome
 from detectors import BreathingAggregator, SoundConfig, SoundDetector, TurnConfig, TurnDetector
 from egg_link import EggLink
 from environment_sensor import EnvironmentReading, EnvironmentSensor
-from hardware import GOLD, LISTENING, OFF, Button, Led, Recorder, Speaker, tone_wav
+from eyes.ipc import COMMAND_TALK, CommandReceiver, DisplayState, write_state
+from hardware import GOLD, LISTENING, OFF, Led, Recorder, Speaker, tone_wav
 from outbox import Outbox, iso
 from uplink import Uplink
 
 logger = logging.getLogger(__name__)
 
-RETRY_PHRASE = "ごめんコケ、うまく聞き取れなかったコケ。もう一回トサカを押して話してほしいコケ。"
+RETRY_PHRASE = "ごめんコケ、うまく聞き取れなかったコケ。もう一回、画面にさわって話してほしいコケ。"
 OFFLINE_PHRASE = "いまインターネットにつながっていないコケ…。少しあとでまた話しかけてほしいコケ。"
 
 
@@ -118,11 +120,9 @@ class ChickenApp:
 
     async def run(self) -> None:
         self._loop = asyncio.get_running_loop()
-        if config.BUTTON_ENABLED:
-            Button(lambda: self._loop.call_soon_threadsafe(self._on_button))
         self.led.set(OFF)
         logger.info("ねるコッコ（鶏）を起動しました：%s", config.FIRMWARE_VERSION)
-        await asyncio.gather(self.egg.run_forever(), self._sync_loop(), self._tick_loop(), self._environment_loop())
+        await asyncio.gather(self.egg.run_forever(), self._sync_loop(), self._tick_loop(), self._environment_loop(), self._display_loop())
 
     # ------------------------------------------------------------ たまご（BLE）から
 
@@ -289,11 +289,27 @@ class ChickenApp:
             self._ring_stop = None
             logger.info("アラームを止めました")
 
-    # ------------------------------------------------------------ トサカボタンで話す（F-04）
+    # ------------------------------------------------------------ 画面（eyes）との連携・タッチで話す（F-04・F-10）
 
-    def _on_button(self) -> None:
+    def _display_state(self) -> DisplayState:
+        ringing = self.alarm.ringing
+        return DisplayState(expression="wake" if ringing else "normal", busy=self._busy_talking, alarm_ringing=ringing)
+
+    async def _display_loop(self) -> None:
+        """状態を画面（別プロセス）に渡し、画面から届いた操作を受け取る。画面が動いていなくても本体は止まらない"""
+        receiver = CommandReceiver(config.DISPLAY_COMMAND_PATH)
+        while True:
+            try:
+                write_state(config.DISPLAY_STATE_PATH, self._display_state())
+                if receiver.poll() == COMMAND_TALK:
+                    self._on_talk_requested()
+            except Exception:
+                logger.exception("画面との連携でエラーが起きました")
+            await asyncio.sleep(config.DISPLAY_POLL_SEC)
+
+    def _on_talk_requested(self) -> None:
         if self.alarm.ringing:
-            logger.info("アラーム中のボタンは使いません（たまごを巣に戻すと止まる）")
+            logger.info("アラーム中の会話は始めません（たまごを巣に戻すと止まる）")
             return
         if self._busy_talking:
             return
