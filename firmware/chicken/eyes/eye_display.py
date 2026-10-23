@@ -6,7 +6,9 @@
     python3 -m eyes.eye_display --darkness 0.0           # 昼の配色（0.0=昼、1.0=夜）
     python3 -m eyes.eye_display --save-frames out/       # 画面なしで表情ごとの PNG を保存して確認
 
-キー：1=通常 2=眠い 3=うれしい 4=起こす、5=昼 6=夜 7=時刻で自動、Esc か Q で終了。
+    python3 -m eyes.eye_display --link                   # 本体（app.py）と連携：状態を読み、タッチでメニュー・会話開始
+
+連携なしのときのキー：1=通常 2=眠い 3=うれしい 4=起こす、5=昼 6=夜 7=時刻で自動、Esc か Q で終了。
 実機で調整する値（色・大きさ・位置）は下の定数にまとめている（Issue #28）。
 """
 
@@ -21,12 +23,16 @@ from pathlib import Path
 
 import pygame
 
+import integration_config as config
+
 from .eye_state import EXPRESSIONS, DarknessEstimator, EyeFrame, EyeState, Expression
+from .ipc import CommandSender, DisplayState, read_state
+from .menu import BACK_BUTTON, SCREEN_SIZE as MENU_SCREEN_SIZE, TALK_BUTTON, MenuState, Screen
 
 logger = logging.getLogger(__name__)
 
 # 実機で調整する値
-SCREEN_SIZE = (800, 480)  # 5インチ DSI ディスプレイ
+SCREEN_SIZE = MENU_SCREEN_SIZE  # 5インチ DSI ディスプレイ（800×480。メニューのボタン位置もこの大きさが前提）
 FPS = 60
 # 夜の配色：暗い背景に明るい目（寝室でまぶしくない）
 NIGHT_BACKGROUND = (16, 20, 24)
@@ -122,7 +128,33 @@ def _draw_pupil(
     surface.set_clip(clip_before)
 
 
-def run(windowed: bool, expression: Expression, darkness: float | None) -> None:
+# メニューの文字。日本語フォントがないときは英字で代用する（ラズパイには fonts-noto-cjk を入れる）
+FONT_CANDIDATES = "notosanscjkjp,notosansjp,notosanscjk,takaogothic,ipagothic,ipaexgothic,droidsansfallback,vlgothic"
+MENU_TEXT = {"talk": ("話す", "TALK"), "busy": ("会話中…", "..."), "back": ("もどる", "BACK")}
+
+
+def load_fonts() -> tuple[tuple[pygame.font.Font, pygame.font.Font], bool]:
+    """((大きい文字, 小さい文字), 日本語が出るか)"""
+    path = pygame.font.match_font(FONT_CANDIDATES)
+    return (pygame.font.Font(path, 110), pygame.font.Font(path, 52)), path is not None
+
+
+def draw_menu(surface: pygame.Surface, state: DisplayState, darkness: float, fonts: tuple[pygame.font.Font, pygame.font.Font], has_jp: bool) -> None:
+    """fonts は (大きい文字, 小さい文字)。「話す」は大きく、「もどる」は小さく"""
+    palette = Palette(darkness)
+    surface.fill(palette.background)
+    label_color = palette.pupil
+    talk_text = MENU_TEXT["busy" if state.busy else "talk"][0 if has_jp else 1]
+    talk_fill = _mix(palette.eye, palette.background, 0.6) if state.busy else palette.eye  # 会話中は薄くして押せないと示す
+    back_text = MENU_TEXT["back"][0 if has_jp else 1]
+    for rect, text, fill, font in ((TALK_BUTTON, talk_text, talk_fill, fonts[0]), (BACK_BUTTON, back_text, palette.eye, fonts[1])):
+        box = pygame.Rect(rect)
+        pygame.draw.rect(surface, fill, box, border_radius=40)
+        label = font.render(text, True, label_color)
+        surface.blit(label, label.get_rect(center=box.center))
+
+
+def run(windowed: bool, expression: Expression, darkness: float | None, link: bool = False) -> None:
     pygame.init()
     flags = 0 if windowed else pygame.FULLSCREEN
     screen = pygame.display.set_mode(SCREEN_SIZE, flags)
@@ -133,15 +165,25 @@ def run(windowed: bool, expression: Expression, darkness: float | None) -> None:
     state.set_expression(expression)
     ambient = DarknessEstimator(initial=1.0 if darkness is None else darkness)
     auto = darkness is None  # --darkness 指定なしなら、時刻で自動
+    menu = MenuState(config.MENU_TIMEOUT_SEC)
+    sender = CommandSender(config.DISPLAY_COMMAND_PATH) if link else None
+    fonts, has_jp = load_fonts()
+    link_state = DisplayState()
     running = True
     while running:
+        now = time.monotonic()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            elif event.type == pygame.MOUSEBUTTONDOWN and link:  # DSI のタッチはマウスとして届く（マルチタッチなし）
+                result = menu.tap(now, event.pos, link_state)
+                if result.command and sender:
+                    sender.send(result.command)
+                    logger.info("本体に送りました：%s", result.command)
             elif event.type == pygame.KEYDOWN:
                 if event.key in (pygame.K_ESCAPE, pygame.K_q):
                     running = False
-                elif event.key in KEY_TO_EXPRESSION:
+                elif event.key in KEY_TO_EXPRESSION and not link:
                     state.set_expression(KEY_TO_EXPRESSION[event.key])
                 elif event.key == pygame.K_5:
                     auto = False
@@ -151,13 +193,28 @@ def run(windowed: bool, expression: Expression, darkness: float | None) -> None:
                     ambient.force(1.0)
                 elif event.key == pygame.K_7:
                     auto = True
-        now = time.monotonic()
+        if link:
+            received = read_state(config.DISPLAY_STATE_PATH, time.time(), config.DISPLAY_STALE_SEC)
+            if received is not None:  # 本体が止まっているあいだは、最後の状態のまま目だけ動かす
+                link_state = received
+                state.set_expression(_expression_of(received))
+            menu.tick(now, link_state)
         if auto:
             ambient.update(now, hour=datetime.datetime.now().hour)  # 照度センサーの値は、連携時に lux= で渡す
-        draw_eyes(screen, state.update(now), ambient.value)
+        if link and menu.screen is Screen.MENU:
+            draw_menu(screen, link_state, ambient.value, fonts, has_jp)
+        else:
+            draw_eyes(screen, state.update(now), ambient.value)
         pygame.display.flip()
         clock.tick(FPS)
     pygame.quit()
+
+
+def _expression_of(state: DisplayState) -> Expression:
+    try:
+        return Expression(state.expression)
+    except ValueError:
+        return Expression.NORMAL  # 知らない表情名は通常にする
 
 
 def save_frames(directory: Path) -> None:
@@ -174,6 +231,11 @@ def save_frames(directory: Path) -> None:
         for name, darkness in (("day", 0.0), ("night", 1.0)):
             draw_eyes(surface, frame, darkness)
             pygame.image.save(surface, str(directory / f"{expression.value}_{name}.png"))
+    fonts, has_jp = load_fonts()
+    for name, darkness in (("day", 0.0), ("night", 1.0)):
+        for busy in (False, True):
+            draw_menu(surface, DisplayState(busy=busy), darkness, fonts, has_jp)
+            pygame.image.save(surface, str(directory / f"menu{'_busy' if busy else ''}_{name}.png"))
     logger.info("表情ごとの PNG を保存しました：%s", directory)
     pygame.quit()
 
@@ -184,12 +246,13 @@ def main() -> None:
     parser.add_argument("--windowed", action="store_true", help="全画面でなくウィンドウで表示する")
     parser.add_argument("--expression", choices=[e.value for e in Expression], default="normal")
     parser.add_argument("--darkness", type=float, help="暗さ 0.0=昼 〜 1.0=夜（指定すると固定。なければ時刻で自動）")
+    parser.add_argument("--link", action="store_true", help="本体（app.py）と連携する：状態ファイルを読み、タッチでメニューを開く")
     parser.add_argument("--save-frames", type=Path, help="画面なしで PNG を保存するフォルダ（確認用）")
     args = parser.parse_args()
     if args.save_frames:
         save_frames(args.save_frames)
     else:
-        run(args.windowed, Expression(args.expression), args.darkness)
+        run(args.windowed, Expression(args.expression), args.darkness, args.link)
 
 
 if __name__ == "__main__":
