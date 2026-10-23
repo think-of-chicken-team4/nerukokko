@@ -1,29 +1,27 @@
-import Link from "next/link";
-
+import { DuskView } from "@/components/home/DuskView";
 import { MorningView } from "@/components/home/MorningView";
+import { PrepView } from "@/components/home/PrepView";
 import { SessionWatcher } from "@/components/home/SessionWatcher";
 import { SleepMonitor } from "@/components/home/SleepMonitor";
-import { StartSleepButton } from "@/components/home/StartSleepButton";
-import { ChickenBubble } from "@/components/ui/ChickenBubble";
-import { getCurrentPhase } from "@/lib/data/phase";
+import { getDeviceReadiness } from "@/lib/data/devices";
+import { getEveningData } from "@/lib/data/evening";
+import { getHomePhase } from "@/lib/data/phase";
 import { getMorningData, getSleepCounts } from "@/lib/data/sleep";
-import { formatDateTime } from "@/lib/format";
 import { createClient, getUserId } from "@/lib/supabase/server";
+import { scoreState } from "@/types/score";
 
-// ホーム。DB の状態から判定したフェーズに合わせて表示を切り替える（docs/dev-plan.md §5-2）。
-// 就寝準備（prep）の画面と夕方の就寝提案は、ステップ3・4で作る。
+// ホーム。DB の状態（と「就寝準備へ進む」の cookie）から判定したフェーズに合わせて表示を切り替える（docs/dev-plan.md §5-2）
 export default async function HomePage() {
   const supabase = await createClient();
-  const userId = await getUserId();
-  const [current, profileResult] = await Promise.all([
-    getCurrentPhase(supabase),
-    supabase.from("users").select("display_name").maybeSingle(),
-  ]);
-  const name = profileResult.data?.display_name ?? "";
+  const userId = (await getUserId())!;
+  const current = await getHomePhase(supabase);
   const session = current.session;
 
   if (current.phase === "sleeping" && session) {
-    const counts = await getSleepCounts(supabase, session.id);
+    const [counts, devices] = await Promise.all([
+      getSleepCounts(supabase, session.id),
+      getDeviceReadiness(supabase, true),
+    ]);
     return (
       <>
         <SessionWatcher sessionId={session.id} refreshAt={session.planned_wake_time} />
@@ -33,6 +31,12 @@ export default async function HomePage() {
           plannedWakeTime={session.planned_wake_time}
           initial={counts}
         />
+        {devices.chickenOnline === false && (
+          <p className="hint mt-3">⚠️ にわとりがオフラインです。計測データが届いていません（電源と Wi-Fi を確かめてください）。</p>
+        )}
+        {devices.chickenOnline && devices.eggPlace === "nest" && (
+          <p className="hint mt-3">⚠️ たまごが巣の中にあります。ベッドに置かないと寝返りが計測されません。</p>
+        )}
       </>
     );
   }
@@ -61,40 +65,26 @@ export default async function HomePage() {
     if (data) {
       return (
         <>
-          <SessionWatcher sessionId={session.id} userId={userId!} pollMs={data.session.score === null ? 5_000 : undefined} />
+          <SessionWatcher sessionId={session.id} userId={userId} pollMs={scoreState(data.session.score, data.session.score_details) === "pending" ? 5_000 : undefined} />
           <MorningView data={data} />
         </>
       );
     }
   }
 
-  // 夕方確認（就寝前）
-  const { data: nextAlarm } = await supabase.rpc("next_alarm_at", { p_user_id: userId! }).maybeSingle();
+  // 夕方確認・就寝準備（ほかの端末や鶏で記録が始まったら SessionWatcher が画面を読み直す）
+  const [evening, profileResult] = await Promise.all([
+    getEveningData(supabase, userId),
+    supabase.from("users").select("display_name").maybeSingle(),
+  ]);
   return (
     <>
-      <SessionWatcher userId={userId!} />
-      <ChickenBubble>
-        {name && <span className="font-bold">{name}さん、</span>}
-        今日も一日おつかれさまコケ！夜の準備ができたら「眠りにつく」を押してほしいコケ🌙
-      </ChickenBubble>
-
-      <div className="card">
-        <h2 className="card-title">🌙 今夜の設定</h2>
-        <div className="row">
-          <div>
-            <div className="row-label">起床アラーム</div>
-            <div className="row-sub">
-              <Link href="/settings" className="underline">
-                設定
-              </Link>
-              で変更できます
-            </div>
-          </div>
-          <span className="pill pill-blue">{nextAlarm ? formatDateTime(nextAlarm.ring_at) : "未設定（8時間後）"}</span>
-        </div>
-      </div>
-
-      <StartSleepButton />
+      <SessionWatcher userId={userId} />
+      {current.phase === "prep" ? (
+        <PrepView data={evening} />
+      ) : (
+        <DuskView name={profileResult.data?.display_name ?? ""} data={evening} />
+      )}
     </>
   );
 }

@@ -390,6 +390,41 @@ export type Database = {
           },
         ]
       }
+      google_credentials: {
+        Row: {
+          access_token: string | null
+          connected_at: string
+          expires_at: string | null
+          refresh_token: string
+          scope: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          connected_at?: string
+          expires_at?: string | null
+          refresh_token: string
+          scope?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string | null
+          connected_at?: string
+          expires_at?: string | null
+          refresh_token?: string
+          scope?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_credentials_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       motion_events: {
         Row: {
           detection_source: string
@@ -464,6 +499,35 @@ export type Database = {
           },
         ]
       }
+      oauth_states: {
+        Row: {
+          created_at: string
+          redirect_uri: string
+          state: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          redirect_uri: string
+          state: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          redirect_uri?: string
+          state?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oauth_states_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       presence_events: {
         Row: {
           device_id: string
@@ -505,6 +569,7 @@ export type Database = {
       }
       sleep_recommendations: {
         Row: {
+          announced_at: string | null
           first_event_start: string | null
           first_event_title: string | null
           generated_at: string
@@ -517,6 +582,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          announced_at?: string | null
           first_event_start?: string | null
           first_event_title?: string | null
           generated_at?: string
@@ -529,6 +595,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          announced_at?: string | null
           first_event_start?: string | null
           first_event_title?: string | null
           generated_at?: string
@@ -557,6 +624,7 @@ export type Database = {
           egg_device_id: string | null
           end_time: string | null
           id: string
+          morning_announced_at: string | null
           planned_wake_time: string
           score: number | null
           score_details: Json | null
@@ -570,6 +638,7 @@ export type Database = {
           egg_device_id?: string | null
           end_time?: string | null
           id?: string
+          morning_announced_at?: string | null
           planned_wake_time: string
           score?: number | null
           score_details?: Json | null
@@ -583,6 +652,7 @@ export type Database = {
           egg_device_id?: string | null
           end_time?: string | null
           id?: string
+          morning_announced_at?: string | null
           planned_wake_time?: string
           score?: number | null
           score_details?: Json | null
@@ -640,6 +710,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calendar_status: {
+        Args: never
+        Returns: {
+          connected: boolean
+          connected_at: string
+        }[]
+      }
       next_alarm_at: {
         Args: { p_from?: string; p_user_id: string }
         Returns: {

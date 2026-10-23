@@ -2,8 +2,11 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "@supabase/server";
 
+import { type Announcement, pickAnnouncements } from "../_shared/announcements.ts";
+import { closeStaleSessions, summarizeClosed } from "../_shared/close-stale.ts";
 import { authenticateChicken, resolveEgg } from "../_shared/devices.ts";
-import { CORS, type Db, jsonError, readJson } from "../_shared/http.ts";
+import { CORS, type Db, jsonError, readJson, runInBackground } from "../_shared/http.ts";
+import { jstDateKey } from "../_shared/jst.ts";
 import { normalizeMac } from "../_shared/ingest-payload.ts";
 
 const MAX_BODY_BYTES = 16 * 1024;
@@ -66,6 +69,11 @@ export default {
       }
     }
 
+    // 巣に戻らないまま起床予定から3時間たった記録を締める（定期実行の close-stale-sessions の予備。T-209）
+    // 締めたあとは進行中のセッションがなくなるので、鶏のアラームも止まる（alarm は次のアラームになる）
+    const closed = await closeStaleSessions(db, { userId: chicken.user_id, now });
+    if (closed.length > 0) runInBackground(summarizeClosed(db, closed), "morning-summary (stale)");
+
     const [sessionResult, alarmResult, settingsResult] = await Promise.all([
       db
         .from("sleep_sessions")
@@ -74,7 +82,11 @@ export default {
         .eq("status", "in_progress")
         .maybeSingle(),
       db.rpc("next_alarm_at", { p_user_id: chicken.user_id, p_from: now.toISOString() }).maybeSingle(),
-      db.from("notification_settings").select("character_voice").eq("user_id", chicken.user_id).maybeSingle(),
+      db
+        .from("notification_settings")
+        .select("character_voice, evening_suggestion, morning_score")
+        .eq("user_id", chicken.user_id)
+        .maybeSingle(),
     ]);
     for (const result of [sessionResult, alarmResult, settingsResult]) {
       if (result.error) throw new Error(result.error.message);
@@ -89,11 +101,91 @@ export default {
         ? { ring_at: nextAlarm.ring_at, source: "alarm", alarm_id: nextAlarm.alarm_id }
         : null;
 
+    const announcements = await takeAnnouncements(db, chicken.user_id, now, {
+      sleeping: session !== null,
+      eveningEnabled: settingsResult.data?.evening_suggestion ?? true,
+      morningEnabled: settingsResult.data?.morning_score ?? true,
+    });
+
     return Response.json({
       server_time: now.toISOString(),
       alarm,
       session,
       settings: { character_voice: settingsResult.data?.character_voice ?? "rooster" },
+      announcements,
     });
   }),
 };
+
+const jstHourFormatter = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", hour: "numeric", hourCycle: "h23" });
+
+/**
+ * 鶏が話して知らせる内容（夕方の就寝提案・朝のコメント）を選び、渡したことを記録する（決定ログ 2026-10-16 Q9）。
+ * 「まだ話していない」ものだけを、条件付きの更新で取り出すので、同時に2回呼ばれても二重には渡さない。
+ */
+async function takeAnnouncements(
+  db: Db,
+  userId: string,
+  now: Date,
+  flags: { sleeping: boolean; eveningEnabled: boolean; morningEnabled: boolean },
+): Promise<Announcement[]> {
+  const [recommendation, lastNight] = await Promise.all([
+    db
+      .from("sleep_recommendations")
+      .select("id, recommended_bedtime, reasoning, announced_at")
+      .eq("user_id", userId)
+      .gte("target_date", jstDateKey(now))
+      .order("target_date")
+      .limit(1)
+      .maybeSingle(),
+    db
+      .from("sleep_sessions")
+      .select("id, end_time, morning_announced_at")
+      .eq("user_id", userId)
+      .eq("status", "completed")
+      .order("end_time", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  if (recommendation.error) throw new Error(recommendation.error.message);
+  if (lastNight.error) throw new Error(lastNight.error.message);
+
+  let comment: string | null = null;
+  if (lastNight.data && !lastNight.data.morning_announced_at) {
+    const { data } = await db
+      .from("chat_sessions")
+      .select("chat_messages(role, content)")
+      .eq("sleep_session_id", lastNight.data.id)
+      .eq("trigger", "scheduled_morning")
+      .maybeSingle();
+    comment = data?.chat_messages.find((m) => m.role === "assistant")?.content ?? null;
+  }
+
+  const picked = pickAnnouncements({
+    now,
+    jstHour: Number(jstHourFormatter.format(now)),
+    ...flags,
+    recommendation: recommendation.data,
+    lastNight: lastNight.data ? { ...lastNight.data, comment } : null,
+  });
+
+  const taken: Announcement[] = [];
+  for (const announcement of picked) {
+    const update =
+      announcement.kind === "evening_suggestion"
+        ? db
+            .from("sleep_recommendations")
+            .update({ announced_at: now.toISOString() })
+            .eq("id", recommendation.data!.id)
+            .is("announced_at", null)
+        : db
+            .from("sleep_sessions")
+            .update({ morning_announced_at: now.toISOString() })
+            .eq("id", lastNight.data!.id)
+            .is("morning_announced_at", null);
+    const { data, error } = await update.select("id");
+    if (error) throw new Error(error.message);
+    if (data && data.length > 0) taken.push(announcement);
+  }
+  return taken;
+}

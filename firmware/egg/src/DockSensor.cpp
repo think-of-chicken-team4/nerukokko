@@ -4,37 +4,34 @@
 #include <Arduino.h>
 
 namespace {
-volatile bool edgePending = false;
-volatile uint8_t pendingLevel = 0;
-volatile uint32_t lastEdgeMs = 0;
-
-void IRAM_ATTR handleStatChange() {
-    uint32_t now = millis();
-    if (now - lastEdgeMs < DOCK_DEBOUNCE_MS) {
-        return;
-    }
-    lastEdgeMs = now;
-
-    // STATはオープンドレイン+プルアップ: LOW=充電中(docked=起床), HIGH=非充電(undocked=就寝開始)
-    pendingLevel = (digitalRead(DOCK_STAT_PIN) == LOW) ? 1 : 0;
-    edgePending = true;
+// STAT はオープンドレイン＋プルアップ：LOW = 充電中（巣にある＝起床）、HIGH = 充電していない（巣から出た）
+uint8_t readDocked() {
+    return digitalRead(DOCK_STAT_PIN) == LOW ? 1 : 0;
 }
 } // namespace
 
 void DockSensor::begin() {
     pinMode(DOCK_STAT_PIN, INPUT_PULLUP);
-    attachInterrupt(digitalPinToInterrupt(DOCK_STAT_PIN), handleStatChange, CHANGE);
+    stable_ = candidate_ = readDocked();
+    candidateSinceMs_ = millis();
 }
 
 bool DockSensor::pollEvent(DockEventData& out) {
-    if (!edgePending) {
+    uint32_t now = millis();
+    uint8_t level = readDocked();
+    if (level != candidate_) {
+        candidate_ = level;
+        candidateSinceMs_ = now;
         return false;
     }
+    if (candidate_ != stable_ && now - candidateSinceMs_ >= DOCK_DEBOUNCE_MS) {
+        stable_ = candidate_;
+        out.docked = stable_;
+        return true;
+    }
+    return false;
+}
 
-    noInterrupts();
-    out.docked = pendingLevel;
-    edgePending = false;
-    interrupts();
-
-    return true;
+DockEventData DockSensor::current() const {
+    return DockEventData{stable_};
 }

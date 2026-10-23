@@ -203,15 +203,19 @@ DEVICE_TOKEN=（登録時に表示された値）
     "start_time": "2026-10-01T14:10:00.000Z",
     "planned_wake_time": "2026-10-01T22:30:00.000Z"
   },
-  "settings": { "character_voice": "rooster" }
+  "settings": { "character_voice": "rooster" },
+  "announcements": [
+    { "kind": "morning_summary", "text": "テストさん、おはようコケ！昨夜は…" }
+  ]
 }
 ```
 
 | 項目 | 説明 |
 |---|---|
 | `alarm` | 次に鳴らす時刻。進行中のセッションがあればその `planned_wake_time`（`source: "session"`）、なければ有効なアラームのうち次に来る時刻（`source: "alarm"`、7日以内）。どちらもなければ `null` |
-| `session` | 進行中の睡眠セッション。なければ `null` |
+| `session` | 進行中の睡眠セッション。なければ `null`（起床予定から3時間たっても巣に戻らなかった記録は、このときに締められて `null` になる。§5） |
 | `settings.character_voice` | `rooster`（にわとり）または `chick`（ひよこ） |
+| `announcements` | 鶏が話して知らせる内容（決定ログ 2026-10-16 Q9）。ふだんは空の配列。`kind` は `evening_suggestion`（夕方の就寝提案：19時〜就寝予定、設定「夕方の就寝提案」が ON のとき）か `morning_summary`（朝のコメント：記録が終わって3時間以内、設定「朝のスコア通知」が ON のとき）。**同じ内容は一度しか渡さない**ので、受け取ったら `speak`（§3-4）で声にして流す。寝ているあいだ（記録中）は渡さない |
 
 **鶏の動作**
 
@@ -219,6 +223,26 @@ DEVICE_TOKEN=（登録時に表示された値）
 - 最後に受け取った `alarm` は手元に保存しておき、Wi-Fi が切れていても鳴らせるようにする。
 - たまごが巣に戻った（Dock Event の `docked = 1`）ら、**サーバーを待たずにその場でアラームを止め**、`ingest-sensor-data` で `charge_start` をすぐ送る。
 - 安全のため、最大30分鳴ったら止める（値は設定で変えられるようにする）。
+
+### 3-4. `POST speak` — 文章をにわとりの声にする
+
+`device-sync` の `announcements` を声にして流すときに使う。
+
+```
+POST /functions/v1/speak
+apikey: <publishable キー>
+x-device-token: <デバイストークン>
+Content-Type: application/json
+
+{ "text": "今夜は23:35までに寝るのがおすすめコケ。" }
+```
+
+**レスポンス（200）**：`{ "audio": { "mime_type": "audio/wav", "base64": "UklGR…" } }`
+
+- `text` は1〜300文字（それ以外は 400 `invalid_text`）。
+- 声は設定のキャラボイス（にわとり＝Gemini の `Puck`、ひよこ＝`Leda`）。WAV は PCM 16bit・モノラル・24kHz。
+- 声にできなかった（AI の障害など）ときは `audio: null`。鶏は保存してある定型の音声を流す。
+- 作るのに10秒ほどかかる（20秒ほどの文章の場合）。鶏は受け取ってから流す。
 
 ### 3-3. `POST voice-chat` — 音声会話
 
@@ -250,7 +274,8 @@ Content-Type: audio/wav
 - `chat_session_id` を省略するか、最後の発言から10分以上たっている場合は、新しい会話として扱う。
 - 聞き取れなかったときや AI の障害時も **200 を返し**、`fallback: true` と定型の返答（例：「もう一回言ってほしいコケ」）を返す。
 - `audio` が `null` のときは、鶏に保存してある定型音声を再生する。
-- 返す音声は WAV（PCM 16bit・モノラル・24kHz）。音声認識・合成に使う API は未決（`docs/dev-plan.md` §9 Q5）だが、この形式は変えない。
+- 返す音声は WAV（PCM 16bit・モノラル・24kHz）。聞き取り・返事・音声合成は Gemini で行う（`docs/dev-plan.md` 決定ログ 2026-10-16、Q5）。
+- **録音はサーバーに保存しない**（文字だけを `chat_messages` に残す。Q7）。
 
 ---
 
@@ -305,8 +330,12 @@ const { data } = await supabase.functions.invoke("chat", {
 // data: { chat_session_id: "…", reply: "…", fallback: false }
 ```
 
-- `message` は1〜500文字。
-- サーバーは、直近の睡眠データ・今夜の就寝提案・この会話の直近10件を AI に渡して返答を作り、`chat_messages` に保存する。
+- ログインしたユーザーだけが呼べる（Authorization ヘッダー。`supabase.functions.invoke` なら自動で付く）。
+- `message` は1〜500文字（前後の空白は除く）。それ以外は 400 `invalid_message`。
+- `chat_session_id` が本人のアプリでの会話（`trigger = 'app'`）なら続きとして扱い、なければ新しい会話を作る（返ってきた id を次から送る）。
+- サーバーは、直近の睡眠データ・今夜の就寝提案・次のアラーム・この会話の直近10件を AI に渡して返答を作り、発言と返答を `chat_messages` に保存する。
+- AI が使えないとき（キーがない・混雑・障害）は、定型の返答と `fallback: true` を返す（200）。
+- **1人1時間に30回まで**（Gemini の無料枠を使い切らないため）。超えたら AI を呼ばずに「少し休憩しよう」という定型の返答（`fallback: true`）。
 
 ### 4-4. `POST morning-summary` — 朝の振り返りの再計算
 
@@ -315,16 +344,23 @@ const { data } = await supabase.functions.invoke("chat", {
 ```ts
 await supabase.functions.invoke("morning-summary", { body: { session_id: "…" } });
 // data: { session_id, score, label, details: { efficiency: 88, turn_balance: 90, … }, comment }
+// 睡眠効率・寝返り・呼吸・環境のどれも計測がない夜は score・label が null（dev-plan §6、Q11）
 ```
 
 ### 4-5. `POST evening-suggestion` — 就寝時刻の提案
 
-- 毎日19:00（日本時間）に、サーバーの定期実行が secret キーで呼び、全ユーザーぶん作る。
-- Webアプリから呼ぶと、ログイン中のユーザーの分だけ作り直す（デモ用）。
+- 毎日19:00（日本時間）に、サーバーの定期実行が secret キーで呼び、全ユーザーぶん作る（応答は `{ created, skipped, failed }`）。
+- Webアプリから呼ぶと、ログイン中のユーザーの分だけ作り直す（デモ用。デバイスシミュレーターにボタンあり）。
+- 計算：起きる時刻＝「24時間以内の次のアラーム」と「明日の最初の予定の開始 − 90分」（カレンダー連携しているとき、§4-7）の早いほう。どちらもなければ作らず `recommendation: null`。推奨就寝時刻＝起きる時刻 − 7時間半 − 寝つくまでの時間（直近7晩の平均、10〜60分。記録がなければ15分）。理由文は Gemini（使えなければ定型文）。
+- 予定に合わせるとアラームより早く起きる必要があるときは、理由文で「アラームを早める」ようすすめる（アラームは自動では変えない）。
+- 「明日の最初の予定」：起きる日（日本時間）の主カレンダーの予定のうち、今より後に始まる最初のもの。終日の予定・取り消された予定・自分が不参加にした予定は除く。`first_event_title`・`first_event_start` に保存する（予定がなければ null）。**予定の名前は Gemini に送らない**（時刻だけ）。
+- カレンダーが読めない（連携が切れた・Google に届かない）ときは、アラームだけで作る。
+- 起きる日（`target_date`）ごとに1件。作り直すと上書きする。
 
 ```ts
 const { data } = await supabase.functions.invoke("evening-suggestion", { body: {} });
-// data: { recommendation: { target_date, recommended_bedtime, recommended_wake_time, required_sleep_minutes, reasoning } }
+// data: { recommendation: { target_date, recommended_bedtime, recommended_wake_time, required_sleep_minutes,
+//                          first_event_title, first_event_start, reasoning } }
 ```
 
 ### 4-6. Realtime（画面の自動更新）
@@ -337,9 +373,25 @@ const { data } = await supabase.functions.invoke("evening-suggestion", { body: {
 
 ---
 
+### 4-7. `POST calendar-connect` — Google カレンダー連携（T-205）
+
+Webアプリ（ログインしたユーザー）が呼ぶ。トークンはサーバーの `google_credentials` にだけ保存し、Webアプリには返さない。読むのは予定だけ（スコープ `calendar.readonly`）。
+
+| `action` | 本文 | 応答 |
+|---|---|---|
+| `start` | `{ action, redirect_uri }` | `{ url }`：Google の同意画面。Webアプリはそこへ移る（state を保存。10分で無効） |
+| `finish` | `{ action, code, state, redirect_uri }` | `{ connected: true }`：同意画面から戻ってきた `code` をトークンに換えて保存する（state は1回だけ使える） |
+| `disconnect` | `{ action }` | `{ connected: false }`：Google 側でも取り消して、トークンを消す |
+
+- `redirect_uri` は Webアプリの `/settings/calendar/callback`。関数の環境変数 `GOOGLE_REDIRECT_URIS`（カンマ区切り。既定は `http://localhost:3000/settings/calendar/callback`）にあるものだけ受け付ける。Google Cloud の「承認済みのリダイレクト URI」にも同じものを登録する。
+- エラーの `code`：`not_configured`（503。`GOOGLE_CLIENT_ID`・`GOOGLE_CLIENT_SECRET` がない）、`invalid_redirect_uri`、`invalid_state`（期限切れ・使用済み・他人の state）、`google_error`（Google がトークンを出さなかった）、`scope_missing`（同意画面でカレンダーのチェックを外した）、`no_refresh_token`。
+- 連携しているかは RPC `calendar_status()`（`{ connected, connected_at }`）で読む。
+- refresh token が使えなくなったら（取り消された・**Google Cloud のアプリが「テスト中」の間は7日で切れる**）、サーバーが連携を消す。設定画面は「連携していない」に戻るので、もう一度連携する。
+
 ## 5. サーバー内部の処理
 
 - **起床〜朝の振り返り**：`ingest-sensor-data` が `charge_start` を受ける → セッションを完了 → `morning-summary` をバックグラウンドで実行 → スコア（`sleep_sessions.score`・`score_details`）とにわとりのコメント（`chat_sessions.trigger = 'scheduled_morning'`）を保存 → Realtime で Webアプリに反映。
+- **巣に戻らないまま残った記録**：Supabase Cron が10分ごとに `close-stale-sessions`（secret キー）を呼ぶ。起床予定から3時間たっても進行中の記録を、`end_time` = 起床予定＋3時間・`status = completed` にして（`actual_wake_time` は入れない＝起床を検知できなかった印）、朝の振り返りを作る。`device-sync` を受けたときも、そのユーザーの分を同じように締める（定期実行の予備）。あとから `charge_start` が届いても、完了した記録は変えない。
 - **夕方の提案**：Supabase Cron が毎日 10:00 UTC（＝19:00 日本時間）に `evening-suggestion` を呼ぶ。
 - スコアの計算方法は `docs/dev-plan.md` §6。
 
@@ -383,7 +435,8 @@ API を実装するために、次の変更を加える（`server/supabase/migra
 | 計測系6テーブル | 「デバイス＋時刻＋種類」の一意制約 | 再送時の重複を防ぐため |
 | `sleep_recommendations` | `recommended_wake_time`・`first_event_title`・`first_event_start` を追加 | 夕方確認の画面に「明日の予定」と「起きる時刻」を出すため |
 | `chat_sessions` | `trigger` に `'app'`（Webアプリのテキスト会話）を追加 | |
-| （T-205で追加予定） | `google_credentials`：カレンダー用のトークン | |
+| `google_credentials`（新規、T-205） | カレンダーのトークン。クライアントからは読めない（RPC `calendar_status()` で連携の有無だけ読める） | カレンダー連携（§4-7） |
+| `oauth_states`（新規、T-205） | OAuth の state（10分で無効、1回だけ使える）。クライアントからは読めない | 同意画面から戻ってきたのが本人の操作か確かめるため |
 
 ---
 

@@ -4,7 +4,7 @@ import { ChickenBubble } from "@/components/ui/ChickenBubble";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import { Stat, StatGrid } from "@/components/ui/Stat";
 import type { MorningData } from "@/lib/data/sleep";
-import { scoreLabel } from "@/types/score";
+import { NO_DATA_LABEL, scoreLabel, scoreState } from "@/types/score";
 
 function durationText(startTime: string, endTime: string | null): string {
   if (!endTime) return "—";
@@ -13,7 +13,7 @@ function durationText(startTime: string, endTime: string | null): string {
 }
 
 function wakeDelayText(planned: string, actual: string | null): string {
-  if (!actual) return "—";
+  if (!actual) return "検知なし";
   const seconds = Math.round((new Date(actual).getTime() - new Date(planned).getTime()) / 1000);
   if (seconds <= 0) return "アラーム前";
   return seconds < 120 ? `${seconds}秒` : `${Math.round(seconds / 60)}分`;
@@ -23,14 +23,30 @@ function wakeDelayText(planned: string, actual: string | null): string {
 export function MorningView({ data }: { data: MorningData }) {
   const { session, comment, counts } = data;
   const score = session.score;
+  const state = scoreState(score, session.score_details);
+
+  // 巣に戻したことを検知できず、起床予定の3時間後で自動で締めた夜（T-209）は actual_wake_time がない
+  const wakeDetected = session.actual_wake_time !== null;
 
   return (
     <>
+      {!wakeDetected && (
+        <p className="hint">
+          ⚠️ たまごが巣に戻ったことを検知できなかったので、起床予定の3時間後で記録を締めました。朝はたまごを巣に戻してください（充電の接触も確かめてください）。
+        </p>
+      )}
       <div className="card text-center">
         <div className="eyebrow">睡眠スコア</div>
-        {score === null ? (
-          <p className="muted py-6">スコアを計算しています…</p>
-        ) : (
+        {state === "pending" && <p className="muted py-6">スコアを計算しています…</p>}
+        {state === "no_data" && (
+          <div className="py-4">
+            <div className="font-maru text-lg font-bold">{NO_DATA_LABEL}</div>
+            <p className="muted mt-1">
+              昨夜は、にわとり・たまごから計測のデータが届きませんでした。にわとりの電源と Wi-Fi、たまごの充電を確かめてください。
+            </p>
+          </div>
+        )}
+        {score !== null && (
           <>
             <ScoreRing score={score} />
             <span className="pill pill-gold">{scoreLabel(score)}</span>
@@ -52,6 +68,9 @@ export function MorningView({ data }: { data: MorningData }) {
         </StatGrid>
       </div>
 
+      <Link href="/chat" className="btn btn-secondary">
+        🐔 にわとりと話す
+      </Link>
       <Link href="/records" className="btn btn-secondary">
         📊 記録をもっと見る
       </Link>

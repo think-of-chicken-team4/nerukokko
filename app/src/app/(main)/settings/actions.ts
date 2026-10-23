@@ -1,9 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 import type { ActionResult } from "@/app/(main)/actions";
 import { MAX_ALARMS, validateAlarm, type AlarmInput } from "@/lib/alarm";
+import { calendarRedirectUri, invokeCalendar } from "@/lib/calendar";
 import { createClient, getUserId } from "@/lib/supabase/server";
 
 // アラームを変えると、ホームの「起床アラーム」の表示も変わるので、全体を読み直す
@@ -87,4 +89,17 @@ export async function updateNotificationSettings(patch: Partial<NotificationSett
   if (error || !data) return { error: "保存できませんでした" };
   revalidatePath("/settings");
   return {};
+}
+
+/** 「Googleカレンダーと連携する」：同意画面へ移る（T-205） */
+export async function startCalendarLink(): Promise<void> {
+  const result = await invokeCalendar<{ url: string }>({ action: "start", redirect_uri: await calendarRedirectUri() });
+  redirect("data" in result ? result.data.url : `/settings?calendar=${result.errorCode}`);
+}
+
+/** 連携を解除する（Google 側でも取り消す） */
+export async function disconnectCalendar(): Promise<void> {
+  const result = await invokeCalendar<{ connected: boolean }>({ action: "disconnect" });
+  refresh();
+  redirect(`/settings?calendar=${"data" in result ? "disconnected" : result.errorCode}`);
 }

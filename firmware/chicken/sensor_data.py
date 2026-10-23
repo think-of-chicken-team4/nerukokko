@@ -1,6 +1,6 @@
 """たまごユニットから受信するバイナリ構造体のパース。
 
-tamago/include/SensorData.h の #pragma pack(1) 構造体とバイト列を一致させること。
+firmware/egg/include/SensorData.h の #pragma pack(1) 構造体とバイト列を一致させること。
 """
 
 from __future__ import annotations
@@ -33,20 +33,6 @@ class MotionEvent:
     def from_bytes(cls, data: bytes) -> "MotionEvent":
         x, y, z = struct.unpack(cls._FORMAT, data)
         return cls(x=x, y=y, z=z)
-
-
-@dataclass(frozen=True)
-class Environment:
-    temperature: float  # °C
-    humidity: float  # %RH
-    lux: int
-
-    _FORMAT = "<ffH"
-
-    @classmethod
-    def from_bytes(cls, data: bytes) -> "Environment":
-        temperature, humidity, lux = struct.unpack(cls._FORMAT, data)
-        return cls(temperature=temperature, humidity=humidity, lux=lux)
 
 
 @dataclass(frozen=True)

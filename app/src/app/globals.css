@@ -30,6 +30,10 @@
   --pill-blue-fg: #cfe6f7;
   --pill-pink-fg: #ffc2cd;
   --error-fg: #ffb3c0;
+  /* グラフの色（寝返り・いびき）。夜と朝の両方の背景で、色覚の違いがあっても見分けられることを確認済み */
+  --chart-1: #bf8526;
+  --chart-2: #d7637e;
+  --chart-ring: #23264f;
 }
 
 body {
@@ -69,6 +73,7 @@ body {
   --pill-blue-fg: #3d6a8a;
   --pill-pink-fg: #c14b64;
   --error-fg: #b3344f;
+  --chart-ring: #fffaf2;
 }
 
 /* 朝は背景が明るいので、上部のステータスバーを濃くして白い文字を読みやすくする */
@@ -404,6 +409,57 @@ body {
   .wake-hero-eyes {
     font-size: 52px;
     animation: blink-pulse 1.4s ease-in-out infinite;
+  }
+
+  /* グラフの凡例の小さな丸 */
+  .legend-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    vertical-align: 0;
+  }
+  .legend-dash {
+    display: inline-block;
+    width: 16px;
+    border-top: 1.5px dashed var(--fg-dim);
+    vertical-align: middle;
+  }
+  .legend-dot-hollow {
+    background: transparent;
+    border: 2px solid;
+  }
+
+  /* にわとりとのチャット（components/chat/ChatPanel.tsx。プロトタイプの .msg） */
+  .msg {
+    max-width: 82%;
+    margin-bottom: 10px;
+    padding: 10px 13px;
+    border-radius: 16px;
+    font-size: 13px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .msg-bot {
+    background: rgba(242, 180, 65, 0.18);
+    border: 1px solid rgba(242, 180, 65, 0.3);
+    border-bottom-left-radius: 4px;
+  }
+  .msg-user {
+    margin-left: auto;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-bottom-right-radius: 4px;
+  }
+  .msg-typing {
+    opacity: 0.6;
+    font-style: italic;
+  }
+  .chat-input-row {
+    display: flex;
+    gap: 8px;
+    padding: 10px 0;
   }
 
   .error-text {

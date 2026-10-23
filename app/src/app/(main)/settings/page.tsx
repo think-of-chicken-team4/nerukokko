@@ -2,21 +2,25 @@ import Link from "next/link";
 
 import { logout } from "@/app/login/actions";
 import { AlarmSettings } from "@/components/settings/AlarmSettings";
+import { CalendarSettings } from "@/components/settings/CalendarSettings";
 import { NotificationSettingsCards } from "@/components/settings/NotificationSettings";
+import { calendarMessage } from "@/lib/calendar";
 import { formatDateTime } from "@/lib/format";
 import { isSimulatorEnabled } from "@/lib/simulator";
 import { createClient, getUserId } from "@/lib/supabase/server";
 
-// 設定。アラーム（T-102）・通知とキャラボイス（T-103）・アカウント。カレンダー連携は T-205 で追加する。
-export default async function SettingsPage() {
+// 設定。アラーム（T-102）・カレンダー連携（T-205）・通知とキャラボイス（T-103）・アカウント。
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ calendar?: string }> }) {
+  const { calendar } = await searchParams;
   const supabase = await createClient();
   const userId = await getUserId();
-  const [profileResult, alarmsResult, nextAlarmResult, activeResult, notificationResult] = await Promise.all([
+  const [profileResult, alarmsResult, nextAlarmResult, activeResult, notificationResult, calendarResult] = await Promise.all([
     supabase.from("users").select("display_name, email").maybeSingle(),
     supabase.from("alarms").select("id, time, repeat_days, enabled").order("time"),
     supabase.rpc("next_alarm_at", { p_user_id: userId! }).maybeSingle(),
     supabase.from("sleep_sessions").select("planned_wake_time").eq("status", "in_progress").maybeSingle(),
     supabase.from("notification_settings").select("evening_suggestion, morning_score, character_voice").maybeSingle(),
+    supabase.rpc("calendar_status").maybeSingle(),
   ]);
   if (alarmsResult.error) throw new Error(`アラームを読めませんでした: ${alarmsResult.error.message}`);
   if (notificationResult.error) throw new Error(`通知の設定を読めませんでした: ${notificationResult.error.message}`);
@@ -24,6 +28,7 @@ export default async function SettingsPage() {
   const notification = notificationResult.data;
   const nextAlarm = nextAlarmResult.data;
   const active = activeResult.data;
+  const calendarStatus = calendarResult.data;
 
   return (
     <>
@@ -38,6 +43,12 @@ export default async function SettingsPage() {
         )}
         <AlarmSettings alarms={alarmsResult.data} />
       </div>
+
+      <CalendarSettings
+        connected={calendarStatus?.connected ?? false}
+        connectedAt={calendarStatus?.connected_at ? formatDateTime(calendarStatus.connected_at) : null}
+        message={calendarMessage(calendar)}
+      />
 
       {notification && (
         <NotificationSettingsCards

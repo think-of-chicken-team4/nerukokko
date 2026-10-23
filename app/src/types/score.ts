@@ -17,6 +17,17 @@ export type ScoreDetails = {
   weights_used: Partial<Record<"efficiency" | "turn_balance" | "quietness" | "breathing" | "environment", number>>;
 };
 
+/** スコアの状態：まだ計算中か、計測がなくて出せなかったか（Q11）、出たか */
+export type ScoreState = "pending" | "no_data" | "scored";
+
+/** score が null でも、内訳（score_details）があれば「計算は終わったが計測がなかった」夜 */
+export function scoreState(score: number | null, details: unknown): ScoreState {
+  if (score !== null) return "scored";
+  return details ? "no_data" : "pending";
+}
+
+export const NO_DATA_LABEL = "計測できませんでした";
+
 export function scoreLabel(score: number): string {
   if (score >= 85) return "ぐっすり眠れました";
   if (score >= 65) return "まずまずの睡眠でした";

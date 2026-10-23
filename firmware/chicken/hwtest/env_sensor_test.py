@@ -5,7 +5,7 @@
 
 I2C バス1 を調べ、見つかったセンサーの種類に合わせて読む。対応している種類：
   照度：BH1750（0x23 / 0x5C）
-  温湿度：SHT3x（0x44 / 0x45）、AHT10・AHT20（0x38）、SHT20・HTU21D・Si7021（0x40）
+  温湿度：SHT3x（0x44 / 0x45）、AHT10・AHT20・DHT20（0x38）、SHT20・HTU21D・Si7021（0x40）
 温湿度センサーが見つからないときは、I2C ではない種類（DHT22 など1線式）の可能性がある。
 型番を Issue #4 に書けば、AI が読み取りのコードを書く。
 """
@@ -60,10 +60,39 @@ def read_sht3x(bus: SMBus, address: int) -> tuple[float, float]:
     return temperature, humidity
 
 
+def aht_crc8(data: list[int]) -> int:
+    """AHT20・DHT20 の CRC（多項式 0x31、初期値 0xFF）"""
+    crc = 0xFF
+    for byte in data:
+        crc ^= byte
+        for _ in range(8):
+            crc = ((crc << 1) ^ 0x31) & 0xFF if crc & 0x80 else (crc << 1) & 0xFF
+    return crc
+
+
+def init_aht(bus: SMBus, address: int) -> None:
+    """校正済み（status の bit3）でなければ初期化する（AHT20・DHT20 のデータシートの手順）"""
+    write_raw(bus, address, [0x71])
+    status = read_raw(bus, address, 1)[0]
+    print(f"AHT の status：0x{status:02X}（bit3 が 1 なら校正済み）")
+    if not status & 0x08:
+        write_raw(bus, address, [0xBE, 0x08, 0x00])
+        time.sleep(0.01)
+
+
 def read_aht(bus: SMBus, address: int) -> tuple[float, float]:
+    """AHT10・AHT20・DHT20（Grove Temperature & Humidity Sensor V2.0）。本番の environment_sensor.py と同じ読み方"""
     write_raw(bus, address, [0xAC, 0x33, 0x00])  # 測定開始
     time.sleep(0.08)
-    data = read_raw(bus, address, 6)
+    for _ in range(5):
+        data = read_raw(bus, address, 7)
+        if not data[0] & 0x80:  # bit7 が 0 なら測定が終わっている
+            break
+        time.sleep(0.02)
+    else:
+        raise OSError("AHT: 測定が終わりません")
+    if data[6] != 0xFF and aht_crc8(data[:6]) != data[6]:
+        raise OSError("AHT: CRC が合いません（配線・ノイズを確かめる）")
     humidity_raw = (data[1] << 12) | (data[2] << 4) | (data[3] >> 4)
     temperature_raw = ((data[3] & 0x0F) << 16) | (data[4] << 8) | data[5]
     return temperature_raw / 2**20 * 200 - 50, humidity_raw / 2**20 * 100
@@ -84,7 +113,7 @@ def read_sht2x(bus: SMBus, address: int) -> tuple[float, float]:
 TEMP_HUMIDITY_SENSORS = [
     (0x44, "SHT3x", read_sht3x),
     (0x45, "SHT3x", read_sht3x),
-    (0x38, "AHT10/AHT20", read_aht),
+    (0x38, "AHT10/AHT20/DHT20", read_aht),
     (0x40, "SHT20/HTU21D/Si7021", read_sht2x),
 ]
 LIGHT_SENSORS = [(0x23, "BH1750"), (0x5C, "BH1750")]
@@ -109,7 +138,12 @@ def main() -> None:
             print("→ I2C ではない種類（DHT22 など）の可能性があります。センサーの型番を Issue #4 に書いてください。")
         if light is None and temp is None:
             print("どちらも見つからないため終了します。配線と I2C の有効化（C1）を確認してください。")
+            if not found:
+                print("→ `pinctrl get 2,3` で GPIO2（SDA）・GPIO3（SCL）が lo になっていないか確かめてください。")
+                print("  lo のままなら、どれかのセンサーがバスを押さえています（Issue #17）。1つずつ外して、どれが原因か調べます。")
             return
+        if temp is not None and temp[2] is read_aht:
+            init_aht(bus, temp[0])
 
         csv_path = Path(args.csv or f"env_{datetime.datetime.now():%Y%m%d_%H%M}.csv")
         with csv_path.open("w", newline="", encoding="utf-8") as file:

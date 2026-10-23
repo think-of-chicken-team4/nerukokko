@@ -1,0 +1,14 @@
+# A111 レーダーの exploration server を自動で起動する（C2 で動いた方式。RADAR_LINK=socket）。
+# ACCONEER_SERVER は、Acconeer の Raspberry Pi 用 SDK を置いた場所に合わせて deploy/install.sh が書き換える。
+[Unit]
+Description=Acconeer A111 exploration server
+After=network.target
+
+[Service]
+User=root
+ExecStart=ACCONEER_SERVER
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

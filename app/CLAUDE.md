@@ -11,14 +11,18 @@ Next.js は 16 系。書き方に迷ったら、上の AGENTS.md のとおり `n
 |---|---|
 | `src/app/(main)/` | ログイン後の画面。`layout.tsx` でログイン確認・時間帯の背景・ステータスバー・下部タブを出す |
 | `src/app/login/` | ログイン・新規登録（`actions.ts` が Server Action） |
-| `src/app/(main)/actions.ts` | ホームの Server Action（「眠りにつく」・記録の中止） |
+| `src/app/(main)/actions.ts` | ホームの Server Action（「眠りにつく」・記録の中止・就寝準備へ進む／戻る） |
 | `src/app/(main)/dev/simulator/` | デバイスシミュレーター（鶏の代わりに API へデータを送る開発・デモ用） |
 | `src/components/` | 画面の枠の部品（`StatusBar`・`Clock`・`BottomNav`・`PhaseDial`・`ErrorView`） |
 | `src/components/ui/` | どの画面でも使う部品：`Switch`（ON/OFF）・`SegmentedControl`（今夜／週間などの切り替え、URL で切り替える）・`ChickenBubble`（にわとりのセリフ）・`Stat`/`StatGrid`（数値のタイル）・`ScoreRing`（スコアの円）・`LogItem`（履歴の1行） |
 | `src/components/device/` | デバイスの部品（`ChickenRegistration`＝鶏の登録・トークンの再発行・交換。登録は `src/app/(main)/device/actions.ts`） |
-| `src/components/settings/` | 設定の部品（`AlarmSettings`＝アラームの一覧・編集、`NotificationSettings`＝通知の ON/OFF とキャラボイス。保存は `src/app/(main)/settings/actions.ts`） |
+| `src/components/settings/` | 設定の部品（`AlarmSettings`＝アラームの一覧・編集、`NotificationSettings`＝通知の ON/OFF とキャラボイス、`CalendarSettings`＝Google カレンダー連携。保存は `src/app/(main)/settings/actions.ts`） |
+| `src/lib/calendar.ts`・`src/app/(main)/settings/calendar/callback/` | カレンダー連携（T-205）。Edge Function `calendar-connect` を呼ぶ。Google から戻る URL は `/settings/calendar/callback`（ローカルは **`localhost:3000`** で開く。`127.0.0.1` だと Google に登録した戻り先と合わない） |
+| `src/components/charts/` | グラフ（`EventTimeline`＝寝返り・いびきのタイムライン、`LineChart`＝折れ線、`ScoreBars`＝週間スコアの棒。触れるとその値が出る）。軸の計算は `src/lib/chart.ts` |
+| `src/components/chat/` | にわとりとのチャット（`ChatPanel`。`supabase.functions.invoke("chat")` で送る。ページは `src/app/(main)/chat/`） |
+| `src/components/records/` | 記録の部品（`NightRecordView`＝1晩の記録、`WeekView`＝週間。データは `src/lib/data/night.ts`・`week.ts`） |
 | `src/app/(main)/loading.tsx`・`error.tsx`、`src/app/error.tsx` | 読み込み中の表示と、エラーのときの表示（「もう一度読み込む」） |
-| `src/components/home/` | ホームの部品（`SleepMonitor`＝睡眠中の即時更新、`SessionWatcher`＝セッションの変化で画面を読み直す、`MorningView`＝朝のスコア） |
+| `src/components/home/` | ホームの部品（`DuskView`＝夕方確認、`PrepView`＝就寝準備、`SleepMonitor`＝睡眠中の即時更新、`SessionWatcher`＝セッションの変化で画面を読み直す、`MorningView`＝朝のスコア） |
 | `src/lib/supabase/` | Supabase クライアント（`client.ts`＝ブラウザ、`server.ts`＝サーバー、`proxy.ts`＝セッション更新） |
 | `src/lib/data/` | DB から読んで判定する処理（今のフェーズ、睡眠中・朝の表示データ、デバイスのオンライン判定・たまごの場所・MAC アドレスの整形） |
 | `src/lib/supabase/realtime.ts` | Realtime の購読（`subscribeAsUser`） |
@@ -39,6 +43,7 @@ Next.js は 16 系。書き方に迷ったら、上の AGENTS.md のとおり `n
 - 外部 API（Gemini・カレンダーなど）は Webアプリから直接呼ばず、Edge Function を `supabase.functions.invoke()` で呼ぶ。
 - 見た目はプロトタイプ（`資料/nerukokko_prototype.html`）に合わせる。`src/components/ui/` に部品があるものはそれを使い、なければ `src/app/globals.css` の部品クラス（`card`・`card-title`・`btn btn-primary`・`btn-row`・`row`・`pill pill-gold`・`input`・`hint`・`dev-card-head`・`device-icon` など）を使う。新しい部品が必要なら globals.css にクラスを足し、2画面以上で使うなら `components/ui/` に部品を作る。
 - DB の読み込みでエラーが返ったら、空のデータとして扱わずに `throw` する（`error.tsx` がエラー画面を出す）。データが「ない」場合と「読めなかった」場合を混ぜない。
+- グラフは `src/components/charts/` の部品を使う（ライブラリは入れていない）。縦軸は1つだけにし、別の量は別のグラフにする。色は `var(--chart-1)`（寝返りなど1本目）・`var(--chart-2)`（いびき）。色を足すときは、夜と朝の両方の背景で見分けられるか確かめる。
 - 色は CSS 変数（`var(--fg)`・`var(--fg-dim)`・`var(--card-bg)`・`var(--inset)`・`var(--track)`）を使う。時間帯ごとに自動で切り替わる。朝（`morning`）だけ背景が明るいので、色を足したら朝と夜の両方で読めるか確かめる。
 - 文言は日本語。にわとりのセリフは「〜コケ」の口調。
 - 日時は `src/lib/format.ts` の関数で日本時間にして表示する。
@@ -61,7 +66,11 @@ cd ../server && npm run gen:types
 - `npm run lint`・`npx tsc --noEmit`・`npm run build` が通ること。
 - パッケージを追加・更新したら、`npm ci --dry-run` が通ることも確認する（`package-lock.json` が食い違っていると CI の `npm ci` が失敗する）。失敗したら `node_modules` を消して `npm install` し直す。Node.js は 22 以上を使う。
 - 画面を変えたら、`npm run dev` でブラウザから実際に操作して確認する（スマホ幅 390px で見る）。
+- ホームのフェーズは `getHomePhase()`（`@/lib/data/phase`）で判定する（layout とページで同じ結果になる）。就寝準備は cookie で覚えているので、`has()` ではなく値で確かめる（消した直後の再描画では空の値で残って見える）。
 - 鶏・たまごがなくても、デバイスシミュレーター（設定 →「デバイスシミュレーターを開く」、`/dev/simulator`）で1日の流れを試せる。「仮想の鶏・たまごを登録」→「今から眠る」か「8時間前に寝たことにする」→ データを送る →「巣に戻す（起床）」。関数（`npx supabase functions serve`）を起動しておくこと。
+  - 仮想の鶏・たまごの MAC アドレスとトークンはアカウントごと（MAC はユーザー ID から作る。全ユーザーで1台にしか登録できないため）。
+  - **発表用デモ（T-305）**：シミュレーターの一番上の「▶ デモを始める」で、夕方の提案 → 巣から取り出す → 眠る（8時間前）→ 一晩を1時間ずつ8回で早回し → 巣に戻す（朝のスコア）を自動で進める。速さは3段階。一晩は「前の記録の終わり」より後にしか置けないので、**1つのアカウントで再生できるのは1日1回**が目安（2時間とれなければ始めない）。リハーサルは別のアカウントで。
 - ローカルのテスト用ユーザーは、ログイン画面の「新規登録」で作れる（ローカルではメール確認なし）。
   - 例：名前「テスト」、`tamago@example.com`／`kokekokko123`（ローカルの Supabase にだけ存在するテスト用。`npx supabase db reset` で消えるので、そのときは作り直す）
+  - デモの確認用：名前「デモ」、`demo@example.com`／`kokekokko123`（同じくローカル専用。アラーム 7:00 毎日）
 - テスト用のデータ（アラーム・睡眠記録など）は、管理画面 Studio（http://127.0.0.1:54323）から入れられる。

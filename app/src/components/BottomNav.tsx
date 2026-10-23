@@ -3,16 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-// match：そのタブを選択中として光らせるパス（デバイスシミュレーター /dev は設定から開くので設定タブ）
+// match：そのタブを選択中として光らせるパス（チャットはホームから開くのでホーム、シミュレーター /dev は設定から開くので設定）
 const TABS = [
-  { href: "/", icon: "🏠", label: "ホーム", match: [] },
+  { href: "/", icon: "🏠", label: "ホーム", match: ["/chat"] },
   { href: "/records", icon: "📊", label: "記録", match: ["/records"] },
   { href: "/device", icon: "🐔", label: "デバイス", match: ["/device"] },
   { href: "/settings", icon: "⚙️", label: "設定", match: ["/settings", "/dev"] },
 ] as const;
 
 function isActive(pathname: string, tab: (typeof TABS)[number]) {
-  if (tab.href === "/") return pathname === "/";
+  if (tab.href === "/" && pathname === "/") return true;
   return tab.match.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 

@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 
+import { PREP_COOKIE, PREP_MAX_AGE_SEC } from "@/lib/data/phase";
 import { createClient, getUserId } from "@/lib/supabase/server";
 
 const DEFAULT_SLEEP_HOURS = 8;
@@ -31,6 +33,7 @@ export async function startSleep(): Promise<ActionResult> {
   if (error) {
     return { error: "記録を始められませんでした。すでに記録中かもしれません" };
   }
+  (await cookies()).delete(PREP_COOKIE);
   revalidatePath("/", "layout");
   return {};
 }
@@ -46,4 +49,21 @@ export async function abortSleep(sessionId: string): Promise<ActionResult> {
   if (error) return { error: "中止できませんでした" };
   revalidatePath("/", "layout");
   return {};
+}
+
+/** 夕方確認 →「就寝準備へ進む」 */
+export async function enterPrep(): Promise<void> {
+  (await cookies()).set(PREP_COOKIE, "1", {
+    maxAge: PREP_MAX_AGE_SEC,
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+  });
+  revalidatePath("/", "layout");
+}
+
+/** 就寝準備 →「← 戻る」 */
+export async function leavePrep(): Promise<void> {
+  (await cookies()).delete(PREP_COOKIE);
+  revalidatePath("/", "layout");
 }
