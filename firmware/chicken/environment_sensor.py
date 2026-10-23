@@ -2,7 +2,7 @@
 
 I2C バスを調べて、つながっているチップに合わせて読む（hwtest/env_sensor_test.py と同じ読み方）。
   照度：BH1750（0x23 / 0x5C。SEN0097）
-  温湿度：SHT3x（0x44 / 0x45）、AHT10・AHT20（0x38）、SHT20・HTU21D・Si7021（0x40）
+  温湿度：SHT3x（0x44 / 0x45）、AHT10・AHT20・DHT20（0x38）、SHT20・HTU21D・Si7021（0x40）
 ラズパイ自体の熱で温度が高めに出るので、市販の温湿度計と比べた差を ENV_TEMP_OFFSET_C で直す（実機で調整：C3）。
 """
 
@@ -57,10 +57,44 @@ def read_sht3x(bus, address: int) -> Tuple[float, float]:
     return -45 + 175 * ((d[0] << 8) | d[1]) / 65535, 100 * ((d[3] << 8) | d[4]) / 65535
 
 
+AHT_STATUS_BUSY = 0x80
+AHT_STATUS_CALIBRATED = 0x08
+
+
+def aht_crc8(data: List[int]) -> int:
+    """AHT20・DHT20 の CRC（多項式 0x31、初期値 0xFF）"""
+    crc = 0xFF
+    for byte in data:
+        crc ^= byte
+        for _ in range(8):
+            crc = ((crc << 1) ^ 0x31) & 0xFF if crc & 0x80 else (crc << 1) & 0xFF
+    return crc
+
+
+def aht_initialize(bus, address: int) -> None:
+    """電源を入れたあと、校正済み（status の bit3）でなければ初期化する（AHT20・DHT20 のデータシートの手順）"""
+    _write(bus, address, [0x71])
+    status = _read(bus, address, 1)[0]
+    if not status & AHT_STATUS_CALIBRATED:
+        _write(bus, address, [0xBE, 0x08, 0x00])
+        time.sleep(0.01)
+
+
 def read_aht(bus, address: int) -> Tuple[float, float]:
+    """AHT10・AHT20・DHT20（Grove Temperature & Humidity Sensor V2.0。Issue #17）。
+    測定開始 → 80ms 待つ → 測定中（busy）なら少し待って読み直す → CRC を確かめる"""
     _write(bus, address, [0xAC, 0x33, 0x00])
     time.sleep(0.08)
-    d = _read(bus, address, 6)
+    for _ in range(5):
+        d = _read(bus, address, 7)
+        if not d[0] & AHT_STATUS_BUSY:
+            break
+        time.sleep(0.02)
+    else:
+        raise OSError("AHT: 測定が終わりません")
+    # AHT10 は CRC を返さない（7バイト目が 0xFF のまま）ので、CRC が合わなくても 0xFF なら受け入れる
+    if d[6] != 0xFF and aht_crc8(d[:6]) != d[6]:
+        raise OSError("AHT: CRC が合いません")
     humidity_raw = (d[1] << 12) | (d[2] << 4) | (d[3] >> 4)
     temperature_raw = ((d[3] & 0x0F) << 16) | (d[4] << 8) | d[5]
     return temperature_raw / 2**20 * 200 - 50, humidity_raw / 2**20 * 100
@@ -79,7 +113,7 @@ def read_sht2x(bus, address: int) -> Tuple[float, float]:
 TEMP_SENSORS: List[Tuple[int, str, Callable]] = [
     (0x44, "SHT3x", read_sht3x),
     (0x45, "SHT3x", read_sht3x),
-    (0x38, "AHT10/AHT20", read_aht),
+    (0x38, "AHT10/AHT20/DHT20", read_aht),
     (0x40, "SHT20/HTU21D/Si7021", read_sht2x),
 ]
 LIGHT_ADDRESSES = [0x23, 0x5C]
@@ -99,7 +133,15 @@ class EnvironmentSensor:
             return
 
         found = [a for a in range(0x03, 0x78) if self._present(a)]
+        if not found:
+            # Issue #17：センサーが SDA を lo に保持すると、バスのすべての機器が見えなくなる
+            logger.warning("I2C に何も見つかりません。配線と、SDA が lo に固定されていないか（pinctrl get 2,3）を確かめてください")
         self._temp = next((t for t in TEMP_SENSORS if t[0] in found), None)
+        if self._temp is not None and self._temp[2] is read_aht:
+            try:
+                aht_initialize(self._bus, self._temp[0])
+            except OSError:
+                logger.warning("温湿度センサー（AHT）を初期化できませんでした")
         self._light = next((a for a in LIGHT_ADDRESSES if a in found), None)
         logger.info(
             "環境センサー：温湿度 %s／照度 %s",
