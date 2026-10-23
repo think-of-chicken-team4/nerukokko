@@ -109,6 +109,110 @@ class UplinkTest(unittest.TestCase):
         box.add("charge_events", item(NOW + 10, type="charge_start"))
         self.assertTrue(up.should_send(NOW + 10, NOW, 60))
 
+    def test_payload_matches_api_spec(self) -> None:
+        box, api, up = self.make([200])
+
+        # API仕様に合わせた各種データを送信待ちに登録
+        box.add(
+            "environment",
+            item(
+                NOW - 1,
+                temperature_c=24.5,
+                humidity_pct=52.0,
+                illuminance_lux=3.2,
+            ),
+        )
+        box.add(
+            "breathing",
+            item(NOW - 2, breaths_per_min=14.2, source="mmwave"),
+        )
+        box.add(
+            "motion_events",
+            item(NOW - 3, intensity=0.82, source="accelerometer"),
+        )
+        box.add(
+            "audio_events",
+            item(
+                NOW - 4,
+                type="snore",
+                duration_ms=1200,
+                confidence=0.70,
+                device="egg",
+            ),
+        )
+        box.add(
+            "presence_events",
+            item(NOW - 5, state="in_bed"),
+        )
+        box.add(
+            "charge_events",
+            item(NOW - 6, type="charge_start"),
+        )
+
+        # 送信を実行
+        self.assertEqual(up.send(NOW), Outcome.OK)
+
+        payload = api.payloads[0]
+
+        # 必須項目とトップレベルの構造を確認
+        self.assertEqual(
+            set(payload.keys()),
+            {
+                "sent_at",
+                "firmware_version",
+                "egg",
+                "environment",
+                "breathing",
+                "motion_events",
+                "audio_events",
+                "presence_events",
+                "charge_events",
+            },
+        )
+        self.assertEqual(payload["sent_at"], iso(NOW))
+        self.assertTrue(payload["sent_at"].endswith("Z"))
+        self.assertEqual(payload["firmware_version"], "chicken-test")
+        self.assertEqual(
+            payload["egg"]["mac_address"],
+            "AA:BB:CC:DD:EE:FF",
+        )
+
+        # 各イベントのフィールド名・値・計測時刻を確認
+        self.assertEqual(
+            payload["environment"][0],
+            item(
+                NOW - 1,
+                temperature_c=24.5,
+                humidity_pct=52.0,
+                illuminance_lux=3.2,
+            ),
+        )
+        self.assertEqual(
+            payload["breathing"][0],
+            item(NOW - 2, breaths_per_min=14.2, source="mmwave"),
+        )
+        self.assertEqual(
+            payload["motion_events"][0],
+            item(NOW - 3, intensity=0.82, source="accelerometer"),
+        )
+        self.assertEqual(
+            payload["audio_events"][0],
+            item(
+                NOW - 4,
+                type="snore",
+                duration_ms=1200,
+                confidence=0.70,
+                device="egg",
+            ),
+        )
+        self.assertEqual(
+            payload["presence_events"][0],
+            item(NOW - 5, state="in_bed"),
+        )
+        self.assertEqual(
+            payload["charge_events"][0],
+            item(NOW - 6, type="charge_start"),
+        )
 
 if __name__ == "__main__":
     unittest.main()
