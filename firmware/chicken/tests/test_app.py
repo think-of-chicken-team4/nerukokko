@@ -1,5 +1,6 @@
 import time
 import unittest
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 from app import ChickenApp
@@ -73,6 +74,55 @@ class ChickenAppIntegrationTest(unittest.TestCase):
         # 送信成功後、送信待ちデータが消えることを確認
         self.assertEqual(app.outbox.count(), 0)
 
+    def test_audio_event_is_saved_to_outbox(self):
+        app = ChickenApp.__new__(ChickenApp)
+        app.outbox = Outbox()
+
+        timestamp = time.time()
+        app.sounds = Mock()
+        app.sounds.add.return_value = [
+            SimpleNamespace(
+                timestamp=timestamp,
+                type="snore",
+                duration_ms=850,
+                confidence=0.92,
+            )
+        ]
+
+        app._on_audio(123)
+
+        batch = app.outbox.take_batch(time.time())
+        self.assertEqual(len(batch["audio_events"]), 1)
+
+        event = batch["audio_events"][0]
+        self.assertEqual(event["type"], "snore")
+        self.assertEqual(event["duration_ms"], 850)
+        self.assertEqual(event["confidence"], 0.92)
+        self.assertEqual(event["device"], "egg")
+        self.assertIn("timestamp", event)
+
+    def test_motion_event_is_saved_to_outbox(self):
+        app = ChickenApp.__new__(ChickenApp)
+        app.outbox = Outbox()
+
+        timestamp = time.time()
+        app.turns = Mock()
+        app.turns.add.return_value = [
+            SimpleNamespace(
+                timestamp=timestamp,
+                intensity=1.4,
+            )
+        ]
+
+        app._on_motion(120, -40, 990)
+
+        batch = app.outbox.take_batch(time.time())
+        self.assertEqual(len(batch["motion_events"]), 1)
+
+        event = batch["motion_events"][0]
+        self.assertEqual(event["intensity"], 1.4)
+        self.assertEqual(event["source"], "accelerometer")
+        self.assertIn("timestamp", event)
 
 if __name__ == "__main__":
     unittest.main()
