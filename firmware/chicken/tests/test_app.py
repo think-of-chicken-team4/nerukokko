@@ -1,10 +1,12 @@
+import asyncio
 import time
 import unittest
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from app import ChickenApp
 from api_client import ApiClient, Outcome
+from environment_sensor import EnvironmentReading
 from outbox import Outbox
 from uplink import Uplink
 
@@ -123,6 +125,85 @@ class ChickenAppIntegrationTest(unittest.TestCase):
         self.assertEqual(event["intensity"], 1.4)
         self.assertEqual(event["source"], "accelerometer")
         self.assertIn("timestamp", event)
+
+    def test_tick_loop_records_breathing_and_presence(self):
+        app = ChickenApp.__new__(ChickenApp)
+        app.outbox = Mock()
+        app.alarm = Mock()
+        app.alarm.tick.return_value = None
+        app.turns = Mock()
+        app.turns.flush.return_value = []
+        app.sounds = Mock()
+        app.sounds.flush.return_value = []
+        app.breathing = Mock()
+
+        event_time = 1_800_000_000.0
+        app.breathing.add.return_value = [(event_time, 14.0)]
+
+        app.radar = Mock()
+        app.radar.get_latest_breathing_rate.return_value = 14.0
+        app.radar.pop_presence_changes.return_value = [
+            (event_time, "in_bed")
+        ]
+
+        app.api = Mock()
+        app.api.configured = False
+
+        async def stop_after_one_cycle(_seconds):
+            raise asyncio.CancelledError
+
+        with patch("app.asyncio.sleep", new=stop_after_one_cycle):
+            with self.assertRaises(asyncio.CancelledError):
+                asyncio.run(app._tick_loop())
+
+        records = {
+            call.args[0]: call.args[1]
+            for call in app.outbox.add.call_args_list
+        }
+
+        self.assertIn("breathing", records)
+        self.assertEqual(
+            records["breathing"]["breaths_per_min"], 14.0
+        )
+        self.assertEqual(records["breathing"]["source"], "mmwave")
+
+        self.assertIn("presence_events", records)
+        self.assertEqual(
+            records["presence_events"]["state"], "in_bed"
+        )
+
+    def test_environment_loop_records_reading(self):
+        app = ChickenApp.__new__(ChickenApp)
+        app.outbox = Mock()
+        app.environment = Mock()
+
+        reading = EnvironmentReading(24.5, 55.0, 120.0)
+        app.environment.read.return_value = reading
+        app.latest_env = EnvironmentReading(None, None, None)
+
+        async def fake_to_thread(func, *args, **kwargs):
+            return func(*args, **kwargs)
+
+        async def stop_after_one_cycle(_seconds):
+            raise asyncio.CancelledError
+
+        with (
+            patch("app.asyncio.to_thread", new=fake_to_thread),
+            patch("app.asyncio.sleep", new=stop_after_one_cycle),
+        ):
+            with self.assertRaises(asyncio.CancelledError):
+                asyncio.run(app._environment_loop())
+
+        app.environment.read.assert_called_once()
+        self.assertEqual(app.latest_env, reading)
+        app.outbox.add.assert_called_once()
+
+        kind, item = app.outbox.add.call_args.args
+        self.assertEqual(kind, "environment")
+        self.assertIn("timestamp", item)
+        self.assertEqual(item["temperature_c"], 24.5)
+        self.assertEqual(item["humidity_pct"], 55.0)
+        self.assertEqual(item["illuminance_lux"], 120.0)
 
 if __name__ == "__main__":
     unittest.main()
