@@ -7,6 +7,7 @@
 |---|---|---|
 | `check_setup.py` | C1 セットアップ・ピン | `python3 hwtest/check_setup.py` |
 | `radar_test.py` | C2 ミリ波レーダー | `python3 hwtest/radar_test.py --count` |
+| `radar_conditions.py` | C2 レーダーの条件別の測定（人なし・呼吸・息止めの反射の強さを記録。しきい値の確認） | `python3 hwtest/radar_conditions.py` |
 | `env_sensor_test.py` | C3 温湿度・照度 | `python3 hwtest/env_sensor_test.py --count 12` |
 | `audio_test.py` | C4 マイク・C5 スピーカー | `python3 hwtest/audio_test.py record` / `rooster --volume 0.5` |
 | `led_test.py` | C6 LED | `sudo .venv/bin/python hwtest/led_test.py --mode sunrise` |

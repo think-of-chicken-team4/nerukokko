@@ -256,6 +256,7 @@ dtoverlay=googlevoicehat-soundcard
 
 
 **2026-10-16 の結果を受けて**：岡田さんの測定（#16）から、誤検知を防ぐフィルタ（`firmware/chicken/radar_filter.py`）を入れた。しきい値は `integration_config.py` の `RADAR_PRESENCE_ENV_MAX`（100）・`RADAR_BREATHING_STD_MM`（0.5）。**次は、実際のベッドの置き場所（距離・角度・布団をかけた状態）で同じ測定をして、しきい値を確かめる。**
+測定には `python3 hwtest/radar_conditions.py` を使う（人なし・普通に呼吸・息止めを順に測り、`env_max` の最小・最大と `peak_std_mm` の中央値を出す。結果を #16 に貼る）。`RADAR_PRESENCE_ENV_MAX` は「人なしの最大」と「人ありの最小」のあいだ、`RADAR_BREATHING_STD_MM` は「呼吸」と「息止め」の `peak_std_mm` の中央値のあいだに決める。
 ---
 
 ### C3. 温湿度・照度センサー（浅井・Issue #17、関連 #4）
