@@ -264,5 +264,39 @@ class ChickenAppIntegrationTest(unittest.TestCase):
             "snore",
         )
 
+    def test_radar_disabled_returns_none(self):
+        app = ChickenApp.__new__(ChickenApp)
+
+        with patch("app.config.RADAR_ENABLED", False):
+            self.assertIsNone(app._start_radar())
+
+    def test_radar_start_failure_is_nonfatal(self):
+        app = ChickenApp.__new__(ChickenApp)
+        fake_module = Mock()
+        fake_module.RadarSensor.side_effect = RuntimeError(
+            "radar startup failed"
+        )
+
+        with (
+            patch("app.config.RADAR_ENABLED", True),
+            patch.dict("sys.modules", {"radar_sensor": fake_module}),
+        ):
+            self.assertIsNone(app._start_radar())
+
+    def test_radar_starts_when_available(self):
+        app = ChickenApp.__new__(ChickenApp)
+        fake_radar = Mock()
+        fake_module = Mock()
+        fake_module.RadarSensor.return_value = fake_radar
+
+        with (
+            patch("app.config.RADAR_ENABLED", True),
+            patch.dict("sys.modules", {"radar_sensor": fake_module}),
+        ):
+            result = app._start_radar()
+
+        self.assertIs(result, fake_radar)
+        fake_radar.start.assert_called_once()
+
 if __name__ == "__main__":
     unittest.main()
