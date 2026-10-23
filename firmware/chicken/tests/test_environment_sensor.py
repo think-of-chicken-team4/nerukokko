@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import sys
 import unittest
+import threading
 from pathlib import Path
 from typing import List
 from unittest import mock
@@ -81,6 +82,25 @@ class AhtTest(unittest.TestCase):
         self.run_with(fake, env.aht_initialize)
         self.assertEqual(fake.writes, [[0x71], [0xBE, 0x08, 0x00]])
 
+class EnvironmentSensorLifecycleTest(unittest.TestCase):
+    def test_close_releases_bus_once_and_read_returns_empty(self):
+        sensor = env.EnvironmentSensor.__new__(env.EnvironmentSensor)
+        sensor._lock = threading.Lock()
+        sensor._bus = mock.Mock()
+        sensor._temp = None
+        sensor._light = None
+
+        bus = sensor._bus
+
+        sensor.close()
+
+        bus.close.assert_called_once_with()
+        self.assertIsNone(sensor._bus)
+        self.assertTrue(sensor.read().is_empty())
+
+        # 2回目にcloseしても、バスは再度閉じない
+        sensor.close()
+        bus.close.assert_called_once_with()
 
 if __name__ == "__main__":
     unittest.main()

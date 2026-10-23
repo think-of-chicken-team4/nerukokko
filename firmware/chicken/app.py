@@ -122,8 +122,45 @@ class ChickenApp:
             Button(lambda: self._loop.call_soon_threadsafe(self._on_button))
         self.led.set(OFF)
         logger.info("ねるコッコ（鶏）を起動しました：%s", config.FIRMWARE_VERSION)
-        await asyncio.gather(self.egg.run_forever(), self._sync_loop(), self._tick_loop(), self._environment_loop())
 
+        tasks = [
+            asyncio.create_task(self.egg.run_forever()),
+            asyncio.create_task(self._sync_loop()),
+            asyncio.create_task(self._tick_loop()),
+            asyncio.create_task(self._environment_loop()),
+        ]
+
+        try:
+            await asyncio.gather(*tasks)
+        finally:
+            # 残っている処理を停止する
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+            # アラームを停止する
+            self._stop_ringing()
+
+            # 環境センサーのI2Cバスを解放する
+            try:
+                await asyncio.to_thread(self.environment.close)
+            except Exception:
+                logger.exception("環境センサーを終了できませんでした")
+
+            # レーダーを停止する
+            if self.radar is not None:
+                try:
+                    self.radar.stop()
+                except Exception:
+                    logger.exception("レーダーを終了できませんでした")
+
+            # LEDを消灯する
+            try:
+                self.led.set(OFF)
+            except Exception:
+                logger.exception("LEDを消灯できませんでした")
     # ------------------------------------------------------------ たまご（BLE）から
 
     def _on_connection(self, connected: bool, mac: Optional[str]) -> None:

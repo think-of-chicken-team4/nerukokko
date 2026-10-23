@@ -1,6 +1,9 @@
 import asyncio
 import time
 import unittest
+from unittest.mock import AsyncMock, Mock, patch
+
+from hardware import OFF
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -297,6 +300,35 @@ class ChickenAppIntegrationTest(unittest.TestCase):
 
         self.assertIs(result, fake_radar)
         fake_radar.start.assert_called_once()
+
+    def test_run_cleans_up_resources_after_task_failure(self):
+        app = ChickenApp.__new__(ChickenApp)
+        app._loop = None
+        app.egg = Mock()
+        app.egg.run_forever = AsyncMock(
+            side_effect=RuntimeError("test error")
+        )
+
+        async def wait_forever():
+            await asyncio.Event().wait()
+
+        app._sync_loop = AsyncMock(side_effect=wait_forever)
+        app._tick_loop = AsyncMock(side_effect=wait_forever)
+        app._environment_loop = AsyncMock(side_effect=wait_forever)
+
+        app.environment = Mock()
+        app.radar = Mock()
+        app.led = Mock()
+        app._stop_ringing = Mock()
+
+        with patch("app.config.BUTTON_ENABLED", False):
+            with self.assertRaisesRegex(RuntimeError, "test error"):
+                asyncio.run(app.run())
+
+        app.environment.close.assert_called_once_with()
+        app.radar.stop.assert_called_once_with()
+        app._stop_ringing.assert_called_once_with()
+        app.led.set.assert_called_with(OFF)
 
 if __name__ == "__main__":
     unittest.main()

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import time
+import threading
 from dataclasses import dataclass
 from typing import Callable, List, Optional, Tuple
 
@@ -122,6 +123,7 @@ LIGHT_ADDRESSES = [0x23, 0x5C]
 class EnvironmentSensor:
     def __init__(self) -> None:
         self._bus = None
+        self._lock = threading.Lock()
         self._temp: Optional[Tuple[int, str, Callable]] = None
         self._light: Optional[int] = None
         try:
@@ -157,20 +159,49 @@ class EnvironmentSensor:
             return False
 
     def read(self) -> EnvironmentReading:
-        """いまの値。読めなかった値は None（ふつうは60秒ごとに呼ぶ）"""
+        """いまの値。読み取り中はI2Cバスを閉じない。"""
+        with self._lock:
+            return self._read_locked()
+
+    def _read_locked(self) -> EnvironmentReading:
         temperature = humidity = lux = None
+
         if self._bus is None:
             return EnvironmentReading(None, None, None)
+
         if self._temp is not None:
             try:
                 t, h = self._temp[2](self._bus, self._temp[0])
                 temperature = round(t + config.ENV_TEMP_OFFSET_C, 1)
-                humidity = round(max(0.0, min(100.0, h + config.ENV_HUMIDITY_OFFSET_PCT)), 1)
+                humidity = round(
+                    max(
+                        0.0,
+                        min(100.0, h + config.ENV_HUMIDITY_OFFSET_PCT),
+                    ),
+                    1,
+                )
             except OSError:
                 logger.warning("温湿度センサーを読めませんでした")
+
         if self._light is not None:
             try:
                 lux = round(read_bh1750(self._bus, self._light), 1)
             except OSError:
                 logger.warning("照度センサーを読めませんでした")
+
         return EnvironmentReading(temperature, humidity, lux)
+
+    def close(self) -> None:
+        """I2Cバスを閉じてリソースを解放する。"""
+        with self._lock:
+            bus = self._bus
+            self._bus = None
+
+            if bus is not None:
+                try:
+                    bus.close()
+                except Exception:
+                    logger.warning(
+                        "I2Cバスを閉じられませんでした",
+                        exc_info=True,
+                    )
