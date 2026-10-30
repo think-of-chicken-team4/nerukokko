@@ -1,35 +1,22 @@
 // E3：充電検知（巣に置いた・取り出した）の確認（docs/hw-verification.md）
 //   pio run -e hwtest_dock -t upload -t monitor
 //
-// 充電モジュール（MCP73831）の STAT ピンを1msごとに読み、次を表示する。
-//   ・ピンが変化した瞬間（チャタリングも1回ずつ数える）
-//   ・200ms 安定したあとの判定（本番と同じデバウンス時間）
-//   ・2秒ごとの状態
-// STAT は「充電中＝LOW」「充電していない＝HIGH（プルアップ）」。満充電のときも HIGH になるので、
-// 「巣に置いたまま満充電になったとき」「満充電で巣に置いたとき」にどう表示されるかを必ず確認する。
-//
-// 巣からの 5V を分圧して ADC で読む回路を試す場合は、platformio.ini の hwtest_dock に
-//   build_flags = ${env.build_flags} -D VIN_SENSE_PIN=35 -D VIN_DIVIDER_RATIO=2.0
-// のように追加すると、その電圧も表示する（VIN_DIVIDER_RATIO は 分圧前の電圧 ÷ ピンの電圧）。
+// 巣からの 5V を分圧して ADC で読み（本番の DockSensor と同じ。PinConfig.h の DOCK_*）、次を表示する。
+//   ・判定が変化した瞬間（チャタリングも1回ずつ数える）
+//   ・DOCK_DEBOUNCE_MS 安定したあとの判定（本番と同じデバウンス時間）
+//   ・2秒ごとの状態と、巣の電圧
+// 満充電のときも 5V は来るので、「満充電の電池で巣に置いたとき」も検知できることを確認する。
 //
 // シリアルモニタで入力できるコマンド：r … 回数をリセット
 #include <Arduino.h>
 
 #include "PinConfig.h"
 
-#ifndef VIN_SENSE_PIN
-#define VIN_SENSE_PIN -1
-#endif
-#ifndef VIN_DIVIDER_RATIO
-#define VIN_DIVIDER_RATIO 2.0f
-#endif
-
 namespace {
 
 constexpr uint32_t STATUS_INTERVAL_MS = 2000;
-constexpr float VIN_PRESENT_VOLTS = 4.0f;  // これ以上なら「巣から給電されている」とみなす
 
-int rawLevel = HIGH;
+int rawLevel = HIGH;     // LOW = 巣にある、HIGH = 巣にない
 int stableLevel = HIGH;
 uint32_t lastRawChangeMs = 0;
 uint32_t rawEdgesSinceStable = 0;
@@ -38,25 +25,22 @@ uint32_t undockCount = 0;
 uint32_t lastStatusMs = 0;
 String command;
 
-const char* describe(int level) {
-    return level == LOW ? "LOW（充電中＝巣にある）" : "HIGH（充電していない＝巣にない or 満充電）";
+float readDockVolts() {
+    return analogReadMilliVolts(DOCK_VIN_PIN) / 1000.0f * DOCK_DIVIDER_RATIO;
 }
 
-float readVinVolts() {
-    if (VIN_SENSE_PIN < 0) {
-        return -1;
-    }
-    return analogReadMilliVolts(VIN_SENSE_PIN) / 1000.0f * VIN_DIVIDER_RATIO;
+int readDockLevel() {
+    return readDockVolts() >= DOCK_PRESENT_VOLTS ? LOW : HIGH;
+}
+
+const char* describe(int level) {
+    return level == LOW ? "巣にある（巣から給電あり）" : "巣にない（給電なし）";
 }
 
 void printStatus(uint32_t now) {
-    Serial.printf("t=%7.1fs  STAT=%s  巣に置いた=%lu回 取り出した=%lu回", now / 1000.0, describe(stableLevel),
-                  static_cast<unsigned long>(dockCount), static_cast<unsigned long>(undockCount));
-    float vin = readVinVolts();
-    if (vin >= 0) {
-        Serial.printf("  VIN=%.2fV（%s）", vin, vin >= VIN_PRESENT_VOLTS ? "巣から給電あり" : "給電なし");
-    }
-    Serial.println();
+    Serial.printf("t=%7.1fs  %s  巣に置いた=%lu回 取り出した=%lu回  巣の電圧=%.2fV\n", now / 1000.0,
+                  describe(stableLevel), static_cast<unsigned long>(dockCount),
+                  static_cast<unsigned long>(undockCount), readDockVolts());
 }
 
 void readSerialCommand() {
@@ -81,13 +65,10 @@ void readSerialCommand() {
 void setup() {
     Serial.begin(115200);
     delay(500);
-    pinMode(DOCK_STAT_PIN, INPUT_PULLUP);
-    rawLevel = stableLevel = digitalRead(DOCK_STAT_PIN);
-    Serial.printf("\n[E3] 充電検知の確認（STAT=GPIO%d、デバウンス=%lums）\n", DOCK_STAT_PIN,
-                  static_cast<unsigned long>(DOCK_DEBOUNCE_MS));
-    if (VIN_SENSE_PIN >= 0) {
-        Serial.printf("VIN の検知：GPIO%d（分圧比 %.2f）\n", VIN_SENSE_PIN, VIN_DIVIDER_RATIO);
-    }
+    analogSetPinAttenuation(DOCK_VIN_PIN, ADC_11db);
+    rawLevel = stableLevel = readDockLevel();
+    Serial.printf("\n[E3] 充電検知の確認（巣の 5V を GPIO%d で読む、分圧比 %.3f、%.1fV 以上で「巣にある」、デバウンス=%lums）\n",
+                  DOCK_VIN_PIN, DOCK_DIVIDER_RATIO, DOCK_PRESENT_VOLTS, static_cast<unsigned long>(DOCK_DEBOUNCE_MS));
     Serial.printf("起動時の状態：%s\n", describe(stableLevel));
     Serial.println("巣に置く／取り出すを10回ずつ行い、毎回1回だけ判定が出るか確認してください。");
 }
@@ -96,24 +77,24 @@ void loop() {
     readSerialCommand();
     uint32_t now = millis();
 
-    int level = digitalRead(DOCK_STAT_PIN);
+    int level = readDockLevel();
     if (level != rawLevel) {
         rawLevel = level;
         lastRawChangeMs = now;
         ++rawEdgesSinceStable;
-        Serial.printf("  (ピン変化) t=%.3fs → %s\n", now / 1000.0, level == LOW ? "LOW" : "HIGH");
+        Serial.printf("  (判定の変化) t=%.3fs → %s\n", now / 1000.0, level == LOW ? "巣にある" : "巣にない");
     }
 
     if (rawLevel != stableLevel && now - lastRawChangeMs >= DOCK_DEBOUNCE_MS) {
         stableLevel = rawLevel;
         if (stableLevel == LOW) {
             ++dockCount;
-            Serial.printf("【判定】巣に置いた（充電開始） #%lu", static_cast<unsigned long>(dockCount));
+            Serial.printf("【判定】巣に置いた #%lu", static_cast<unsigned long>(dockCount));
         } else {
             ++undockCount;
-            Serial.printf("【判定】取り出した（充電停止） #%lu", static_cast<unsigned long>(undockCount));
+            Serial.printf("【判定】取り出した #%lu", static_cast<unsigned long>(undockCount));
         }
-        Serial.printf("  ※ 確定までのピン変化=%lu回（2回以上ならチャタリングあり）\n",
+        Serial.printf("  ※ 確定までの変化=%lu回（2回以上ならチャタリングあり）\n",
                       static_cast<unsigned long>(rawEdgesSinceStable));
         rawEdgesSinceStable = 0;
     } else if (rawLevel == stableLevel && now - lastRawChangeMs >= DOCK_DEBOUNCE_MS) {

@@ -4,14 +4,15 @@
 #include <Arduino.h>
 
 namespace {
-// STAT はオープンドレイン＋プルアップ：LOW = 充電中（巣にある＝起床）、HIGH = 充電していない（巣から出た）
+// 巣からの 5V を分圧して読む：DOCK_PRESENT_VOLTS 以上 = 巣にある（巣に戻した＝起床）、未満 = 巣から出た
 uint8_t readDocked() {
-    return digitalRead(DOCK_STAT_PIN) == LOW ? 1 : 0;
+    float volts = analogReadMilliVolts(DOCK_VIN_PIN) / 1000.0f * DOCK_DIVIDER_RATIO;
+    return volts >= DOCK_PRESENT_VOLTS ? 1 : 0;
 }
 } // namespace
 
 void DockSensor::begin() {
-    pinMode(DOCK_STAT_PIN, INPUT_PULLUP);
+    analogSetPinAttenuation(DOCK_VIN_PIN, ADC_11db);  // 0〜約3.1V を読めるようにする
     stable_ = candidate_ = readDocked();
     candidateSinceMs_ = millis();
 }
