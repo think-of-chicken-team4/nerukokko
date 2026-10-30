@@ -31,9 +31,17 @@ constexpr int ACCEL_X_PIN = 34;
 constexpr int ACCEL_Y_PIN = 35;
 constexpr int ACCEL_Z_PIN = 36;
 
-// ===== 充電検知（充電モジュール SFE-PRT-14380 / MCP73831 の STAT ピン）=====
-// STAT はオープンドレイン：充電中は LOW（巣に置いた）、充電していないときは外付けのプルアップで HIGH
-constexpr int DOCK_STAT_PIN = 27;
+// ===== 充電検知（巣からの 5V を分圧して ADC で読む。2026-10-30 に STAT 方式から変更：E3・Issue #12）=====
+// 充電モジュールの STAT は、満充電のときも「充電していない」と同じ表示になり、基板の LED にしかつながっていない（取り出せない）。
+// そのため、巣に置いたときにポゴピンから来る 5V を、抵抗2本で分圧して読む。満充電でも 5V は来るので、取りこぼさない。
+//   ポゴピンの 5V ──[DOCK_DIVIDER_UPPER_OHM]──┬──[DOCK_DIVIDER_LOWER_OHM]── GND
+//                                              └── DOCK_VIN_PIN
+constexpr int DOCK_VIN_PIN = 35;                      // ADC1 のピン（GPIO34〜39。ESPr Developer 32 の「35」）
+constexpr float DOCK_DIVIDER_UPPER_OHM = 10000.0f;    // 5V 側の抵抗
+constexpr float DOCK_DIVIDER_LOWER_OHM = 15000.0f;    // GND 側の抵抗（ピンの電圧 = 5V × 15k ÷ 25k = 3.0V。ADC の上限約 3.1V に近い）
+constexpr float DOCK_DIVIDER_RATIO = (DOCK_DIVIDER_UPPER_OHM + DOCK_DIVIDER_LOWER_OHM) / DOCK_DIVIDER_LOWER_OHM;  // ピンの電圧 × これ = 巣の電圧
+// 【実機で調整：E3】この電圧以上なら「巣から給電されている＝巣にある」とみなす（巣の 5V は 4.95V、出したときは 0.24V だった）
+constexpr float DOCK_PRESENT_VOLTS = 4.0f;
 // 【実機で調整：E3・Issue #5】この時間、同じ状態が続いたら「巣に置いた／取り出した」と確定する（ポゴピンのチャタリング対策）
 constexpr uint32_t DOCK_DEBOUNCE_MS = 300;
 
