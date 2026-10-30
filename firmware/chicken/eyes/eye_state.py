@@ -60,6 +60,9 @@ LUX_BRIGHT_ABOVE = 30.0  # この照度を上回ったら「明るい」（暗�
 NIGHT_START_HOUR = 22  # 照度がないときは時刻で決める（22時〜翌6時が夜）
 NIGHT_END_HOUR = 6
 DARKNESS_SMOOTHING_PER_SEC = 0.5  # 切り替えの速さ（小さいほどゆっくり。約数秒かけて変わる）
+# アラーム中は、夜でも画面を昼の明るい配色にして、光でも起こす（LED の代わり。spec-changes X-13・P-08）。
+# 朝日のように少しずつ明るくする（約30秒で9割）。小さいほどゆっくり
+WAKE_BRIGHTEN_PER_SEC = 0.08
 
 
 @dataclass(frozen=True)
@@ -179,6 +182,7 @@ class DarknessEstimator:
 
     照度があれば照度を優先し、なければ時刻で決める。照度の判定にはヒステリシスを持たせ、
     出力はゆっくり近づける（急に明るさが変わって目がちらつかないように）。
+    wake（アラーム中）のときは、暗さに関係なく明るくしていく（光で起こす）。
     """
 
     def __init__(self, initial: float = 1.0) -> None:
@@ -186,7 +190,7 @@ class DarknessEstimator:
         self._dark = initial >= 0.5
         self._last_update: float | None = None
 
-    def update(self, now: float, lux: float | None = None, hour: int | None = None) -> float:
+    def update(self, now: float, lux: float | None = None, hour: int | None = None, wake: bool = False) -> float:
         dt = 0.0 if self._last_update is None else max(0.0, now - self._last_update)
         self._last_update = now
         if lux is not None:
@@ -196,8 +200,9 @@ class DarknessEstimator:
                 self._dark = True
         elif hour is not None:
             self._dark = hour >= NIGHT_START_HOUR or hour < NIGHT_END_HOUR
-        target = 1.0 if self._dark else 0.0
-        self.value += (target - self.value) * min(1.0, DARKNESS_SMOOTHING_PER_SEC * dt)
+        target = 0.0 if wake or not self._dark else 1.0
+        rate = WAKE_BRIGHTEN_PER_SEC if wake else DARKNESS_SMOOTHING_PER_SEC
+        self.value += (target - self.value) * min(1.0, rate * dt)
         return self.value
 
     def force(self, darkness: float) -> None:
