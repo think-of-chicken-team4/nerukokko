@@ -100,8 +100,9 @@ LED_COUNT = _int("LED_COUNT", 2)
 LED_BRIGHTNESS = _int("LED_BRIGHTNESS", 180)  # 0〜255
 
 # ===== 画面（DSI。本体と別プロセスの eyes とファイルでやりとりする。実機で調整：D1〜D3）=====
-DISPLAY_STATE_PATH = DATA_DIR / "display.json"  # 本体 → 画面（表情・会話中・アラーム中）
-DISPLAY_COMMAND_PATH = DATA_DIR / "display_command.json"  # 画面 → 本体（タッチで「話す」）
+DISPLAY_DIR = Path(_str("DISPLAY_DIR", str(DATA_DIR)))  # 本体と画面が共通で使うフォルダ。systemd では /run/nerukokko（deploy/）
+DISPLAY_STATE_PATH = DISPLAY_DIR / "display.json"  # 本体 → 画面（表情・会話中・アラーム中）
+DISPLAY_COMMAND_PATH = DISPLAY_DIR / "display_command.json"  # 画面 → 本体（タッチで「話す」）
 DISPLAY_POLL_SEC = _float("DISPLAY_POLL_SEC", 0.3)  # 状態を書く・操作を読む間隔
 DISPLAY_STALE_SEC = _float("DISPLAY_STALE_SEC", 5.0)  # 状態がこれより古いと、本体が止まったとみなす
 MENU_TIMEOUT_SEC = _float("MENU_TIMEOUT_SEC", 20.0)  # 何も触らないとメニューから目の画面へ戻る

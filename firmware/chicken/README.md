@@ -38,12 +38,12 @@
    ```
 3. **音（マイク・スピーカー）**：C4・C5 で確かめた設定（`/boot/firmware/config.txt` の I2S の dtoverlay）にする。`aplay -L` と `.venv/bin/python hwtest/audio_test.py devices` で名前を確かめ、あとで `AUDIO_OUTPUT_DEVICE`・`MIC_DEVICE` に書く。
 4. **鶏をアカウントに登録する**：鶏で `cat /sys/class/net/wlan0/address` を実行して MAC アドレスを調べ、Webアプリの「デバイス」→「登録してトークンを発行」。表示されたトークンを控える（**一度しか表示されない**）。
-5. **自動起動を入れる**（レーダーの exploration server の場所も指定する）：
+5. **自動起動を入れる**（レーダーの exploration server の場所も指定する）。画面（目・タッチ）は、デスクトップにログインしているふつうのユーザーで `sudo` を付けて実行すると、そのユーザーで自動起動する（日本語の文字は `sudo apt install -y fonts-noto-cjk`）：
    ```bash
    sudo ./deploy/install.sh /home/pi/acconeer/out/acc_exploration_server_a111
    sudo nano /etc/nerukokko/chicken.env   # SUPABASE_URL・SUPABASE_PUBLISHABLE_KEY・DEVICE_TOKEN を書く
-   sudo systemctl restart nerukokko-chicken
-   journalctl -u nerukokko-chicken -f     # 動いているかを見る
+   sudo systemctl restart nerukokko-chicken nerukokko-eyes
+   journalctl -u nerukokko-chicken -f     # 動いているかを見る（画面は nerukokko-eyes）
    ```
 6. **確かめる**：Webアプリの「デバイス」で鶏が「オンライン」になる。たまごの電源を入れると、たまごも出てくる。
 

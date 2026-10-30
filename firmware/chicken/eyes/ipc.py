@@ -4,6 +4,7 @@
     本体 <──読む── 操作ファイル（display_command.json） <──書く── 表示（タッチで「話す」など）
 
 どちらも、一時ファイルに書いてから置き換える（読みかけの壊れたファイルを読まない）。
+本体（root）と画面（デスクトップのユーザー）は別のユーザーで動くので、置き場所は共通のフォルダにする（DISPLAY_DIR）。
 pygame に依存しないので、本体からも使える。docs/dsi-display-spec.md §4。
 """
 
@@ -26,6 +27,7 @@ def write_json_atomic(path: Path, data: dict) -> None:
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False)
+        os.chmod(tmp, 0o666)  # 本体（root）と画面（ふつうのユーザー）の両方が読めるように。秘密の値は入れない
         os.replace(tmp, path)
     except Exception:
         try:

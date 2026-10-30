@@ -2,7 +2,7 @@
 # ログ：journalctl -u nerukokko-chicken -f
 [Unit]
 Description=NeruKokko chicken (sleep assistant)
-After=network-online.target bluetooth.target sound.target acconeer-server.service
+After=systemd-tmpfiles-setup.service network-online.target bluetooth.target sound.target acconeer-server.service
 Wants=network-online.target
 
 [Service]
@@ -10,6 +10,8 @@ Wants=network-online.target
 User=root
 WorkingDirectory=/opt/nerukokko/firmware/chicken
 EnvironmentFile=/etc/nerukokko/chicken.env
+# 画面（nerukokko-eyes）とやりとりするファイルの置き場所（deploy/nerukokko.tmpfiles.conf が作る）
+Environment=DISPLAY_DIR=/run/nerukokko
 ExecStart=/opt/nerukokko/firmware/chicken/.venv/bin/python main.py
 Restart=always
 RestartSec=5
