@@ -87,7 +87,8 @@ MIC_DEVICE = _str("MIC_DEVICE") or None  # sounddevice のデバイス名か番�
 MIC_SAMPLE_RATE = _int("MIC_SAMPLE_RATE", 16000)
 MIC_GAIN = _float("MIC_GAIN", 1.0)  # 声が小さいときは上げる
 MIC_VOICE_LEVEL = _float("MIC_VOICE_LEVEL", 500)  # これより大きい音を「話している」とみなす（16bit の実効値）
-MIC_SILENCE_SEC = _float("MIC_SILENCE_SEC", 1.5)  # 話し終わってこの時間静かなら録音を止める
+MIC_AUTO_STOP = _bool("MIC_AUTO_STOP", False)  # true：話し終わって静かになったら録音を自動で止める。false：画面の「話し終わった」だけで止める（最長 MIC_MAX_SEC は残す）
+MIC_SILENCE_SEC = _float("MIC_SILENCE_SEC", 1.5)  # MIC_AUTO_STOP が true のとき、話し終わってこの時間静かなら録音を止める
 MIC_MAX_SEC = _float("MIC_MAX_SEC", 12)  # 録音の最長（サーバーは約15秒・512KB まで）
 
 # ===== スピーカー（MAX98357A。実機で調整：C5）=====

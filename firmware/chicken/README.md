@@ -57,7 +57,7 @@
 | E2 いびき・寝言 | `SOUND_LOUD_RATIO`・`SOUND_MIN_LOUD_LEVEL` | 3.0・300 | `hwtest_mic` の音量の記録から、静かなとき・いびきのときの値を見て決める |
 | C2 レーダー | `RADAR_PRESENCE_ENV_MAX`・`RADAR_BREATHING_STD_MM`・`RADAR_PRESENCE_HOLD_SEC` | 100・0.5・60 | ベッドの置き場所で「人なし・呼吸・息止め」を測って決める（#16） |
 | C3 温湿度 | `ENV_TEMP_OFFSET_C`・`ENV_HUMIDITY_OFFSET_PCT` | 0・0 | 市販の温湿度計との差 |
-| C4 マイク | `MIC_DEVICE`・`MIC_GAIN`・`MIC_VOICE_LEVEL`・`MIC_SILENCE_SEC` | 既定・1.0・500・1.5 | 会話を始めて話し、話し終わりで録音が止まる値 |
+| C4 マイク | `MIC_DEVICE`・`MIC_GAIN`・`MIC_VOICE_LEVEL`・`MIC_AUTO_STOP`・`MIC_SILENCE_SEC` | 既定・1.0・500・1.5 | 会話を始めて話し、話し終わりで録音が止まる値 |
 | C5 スピーカー | `AUDIO_OUTPUT_DEVICE`・`SPEAKER_VOLUME` | 既定・0.8 | 枕元でちょうどよく聞こえる音量 |
 | C6 LED | `LED_PIN`・`LED_COUNT`・`LED_BRIGHTNESS` | 12・2・180 | 配線と、まぶしすぎない明るさ |
 | D1〜D3 ディスプレイ | `DISPLAY_FPS`・`DISPLAY_POLL_SEC`・`DISPLAY_STALE_SEC`・`MENU_TIMEOUT_SEC`・`EVENING_SLEEPY_HOUR`・`MORNING_AWAKE_HOUR` | 30・0.3・5・20・21・6 | CPU の使用率（D1）を見て `DISPLAY_FPS` を決める。メニューのボタンの大きさ・位置（`eyes/menu.py`）は指で押しやすいか確かめる。`docs/dsi-display-spec.md` §5 |

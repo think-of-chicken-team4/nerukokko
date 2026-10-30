@@ -183,7 +183,7 @@ class Recorder:
             elif heard_voice and quiet_since is None:
                 quiet_since = now
             if (
-                (quiet_since is not None and now - quiet_since >= config.MIC_SILENCE_SEC)
+                (config.MIC_AUTO_STOP and quiet_since is not None and now - quiet_since >= config.MIC_SILENCE_SEC)
                 or now - started >= config.MIC_MAX_SEC
                 or (stop is not None and stop.is_set())  # 画面の「話し終わった」
             ):
