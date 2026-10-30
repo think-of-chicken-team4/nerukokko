@@ -12,7 +12,7 @@
 
 **作業を始めるときは、まずここを読む。** 作業の区切りごとに更新する。
 
-最終更新：2026-10-23（1日の作業の終わり）
+最終更新：2026-10-30（クラウドに公開した）
 
 ### 現在の状況
 - **仕様書にある機能のコードは、ほぼすべて `main` に入った**（#39〜#47、10/23 までにマージ。タスク：全44件中36件完了。F-10 を追加）。残りは人が行うもの（実機検証 T-301〜T-303、その結果での修正 T-304）、田村さんの設定が必要なもの（T-004 クラウドの準備、T-205 の本物の Google での確認）、配線待ちの F-09（たまごの電池残量）。
@@ -20,13 +20,14 @@
 - **C3（#17、10/23 岡田さん）**：照度（BH1750）は合格。温湿度センサーは Grove の **DHT20（AHT20）** と判明したが、この個体は SDA を押さえてしまい検出できず（個体不良の疑い）。**別の個体で確かめ直す**。読み取りのコードは DHT20 の手順（初期化・待ち・CRC）に合わせた（`aryu-c3-followup`）。
 - **DSI ディスプレイ（#28）**：10/23 に仕様を決定（`docs/dsi-display-spec.md`）。常に目を表示（夜は暗い目）、タッチでメニュー→会話。**トサカボタンは廃止**。開発は岡田さん（F-10）。
 - カレンダー連携は、OAuth クライアントがないと設定画面に「準備中」と出るだけで、ほかは動く。
+- **公開版**：https://nerukokko.vercel.app （10/30。Supabase のクラウド＋Vercel。シミュレーターは使える設定。発表の前に `NEXT_PUBLIC_ENABLE_SIMULATOR` を `false` にする）。手順と、つまずいた点は `docs/cloud-setup.md`。
 - **開発仕様書（R08）**：文章は実装に合わせて Rev-1.1 に直した（10/23、田村さん）。図とフローチャートは未更新（下の TODO）。
 
 ### 次にやること
 
 **次回の作業の最初に、田村さんに知らせること（TODO）**
 - [ ] **開発仕様書（R08、Word）の図とフローチャートを作り直す**（来週、田村さん）。文章は Rev-1.1 に直し済み（10/23）。残りは画像の4つ：2.3 システム構成図（にわとりを Raspberry Pi 3 に、出力にディスプレイ、入力にタッチ）、p.8 立面図（トサカボタン → 目の位置のタッチディスプレイ）、フローチャート①（充電検知を MCP73831 に）、フローチャート②（「ボタン押す」→「画面をタッチし、会話を選ぶ」、音声認識・合成を Gemini に）。直す内容はリポジトリ外の `資料/開発仕様書_修正一覧_20261023.md` の B〜E。
-- [ ] **Supabase のクラウドの設定（公開の準備）**（田村さん。10/23 はできなかった）。`docs/cloud-setup.md` §4（Supabase）→ §5（Vercel）→ §6（公開後の設定）。追加でやること：Authentication の「Confirm email」をオフ、Vercel の `NEXT_PUBLIC_ENABLE_SIMULATOR` は最初 `true`、カレンダーを使うメンバーを Google Cloud のテストユーザーに追加。
+- [x] ~~Supabase のクラウドの設定（公開の準備）~~ → **10/30 に完了**。Supabase（Tokyo、Free）と Vercel（Hobby）で公開した：**https://nerukokko.vercel.app**。新規登録・チャット・デモ・朝のスコアまで動作確認済み。残りは Google（§3・§6-1・§6-2）と鶏の接続先（§6-4）。
 
 **そのほか**
 1. **岡田さん**：DSI ディスプレイの開発（F-10、Issue #44）。本体（`app.py`）とのつなぎ方は岡田さんが決める。Claude は相談があれば手伝う。
@@ -221,7 +222,7 @@ Docker Desktop を起動してから、それぞれ別のターミナルで：
 | T-001 | 開発ルール整備（CLAUDE.md・CONTRIBUTING.md・dev-plan・PRテンプレート） | O | ✅ | main にマージされ、全員が読める |
 | T-002 | `ren` ブランチのレビューとマージ | O | ✅ | PR #2 でマージ済み。残りの指摘は Issue #3〜#6 |
 | T-003 | `docs/api-spec.md` 作成（ingest / device-sync / chat / voice-chat の契約、デバイス認証） | O | ✅ v1.0 で決定 | リクエスト・レスポンスの JSON 例とエラー仕様がある |
-| T-004 | アカウント作成（Supabase・Gemini API キー・Google Cloud の OAuth クライアント・Vercel）と Supabase CLI 初期化（`server/supabase/`） | O | 🟡 ローカル環境（Docker）で起動できる。クラウドの手順は `docs/cloud-setup.md`（10/17 作成）。アカウントは公開時（ステップ6）に田村さんが作る | 作成手順が docs にあり、キーは各自の `.env` とSupabaseのシークレットにだけ入っている。`npx supabase` で migrations・functions を管理でき、コマンドが CLAUDE.md §8 にある |
+| T-004 | アカウント作成（Supabase・Gemini API キー・Google Cloud の OAuth クライアント・Vercel）と Supabase CLI 初期化（`server/supabase/`） | O | 🟡 Supabase（クラウド）・Gemini・Vercel は済み（10/30、https://nerukokko.vercel.app）。Google Cloud の OAuth クライアントが残り（`docs/cloud-setup.md` §3） | 作成手順が docs にあり、キーは各自の `.env` とSupabaseのシークレットにだけ入っている。`npx supabase` で migrations・functions を管理でき、コマンドが CLAUDE.md §8 にある |
 | T-005 | DBマイグレーション（全テーブル・インデックス・CHECK・RLS・ユーザー初期化トリガー・シード） | O | ✅ マイグレーション・テスト・型生成（`npm run gen:types`） | 空のDBに適用でき、他人のデータが読めないことを確認済み。型を生成できる |
 | T-006 | Next.js 雛形（`app/`）：TS・Tailwind・ESLint・Supabase クライアント・ログイン・共通レイアウト | O | ✅ Next.js 16・メールとパスワードでログイン（Google ログインはステップ6） | ログイン→ホーム表示→ログアウトができる。`npm run build` が通る。コマンドが CLAUDE.md §8 にある |
 | T-007 | CI（GitHub Actions）：app の lint・型チェック・ビルド、egg の `pio run`、chicken の構文チェック | S | ✅ DB テストも実行 | PR ごとに自動実行される |
