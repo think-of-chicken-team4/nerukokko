@@ -105,3 +105,4 @@ DISPLAY_COMMAND_PATH = DATA_DIR / "display_command.json"  # 画面 → 本体（
 DISPLAY_POLL_SEC = _float("DISPLAY_POLL_SEC", 0.3)  # 状態を書く・操作を読む間隔
 DISPLAY_STALE_SEC = _float("DISPLAY_STALE_SEC", 5.0)  # 状態がこれより古いと、本体が止まったとみなす
 MENU_TIMEOUT_SEC = _float("MENU_TIMEOUT_SEC", 20.0)  # 何も触らないとメニューから目の画面へ戻る
+EVENING_SLEEPY_HOUR = _int("EVENING_SLEEPY_HOUR", 21)  # この時刻（時）以降、記録していないときは「眠い」目にする

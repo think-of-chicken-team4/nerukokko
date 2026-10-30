@@ -27,6 +27,7 @@ from detectors import BreathingAggregator, SoundConfig, SoundDetector, TurnConfi
 from egg_link import EggLink
 from environment_sensor import EnvironmentReading, EnvironmentSensor
 from eyes.ipc import COMMAND_TALK, CommandReceiver, DisplayState, write_state
+from eyes.mood import TALK_LISTEN, TALK_THINK, choose_expression
 from hardware import GOLD, LISTENING, OFF, Led, Recorder, Speaker, tone_wav
 from outbox import Outbox, iso
 from uplink import Uplink
@@ -98,6 +99,9 @@ class ChickenApp:
         self.chat_session_id: Optional[str] = None
         self._ring_stop: Optional[asyncio.Event] = None
         self._busy_talking = False
+        self._talk_phase: Optional[str] = None  # 会話の段階（表情用）：録音中・返事待ち
+        self._speaking_kind: Optional[str] = None  # お知らせを話している間の kind（表情用）
+        self._session_active = False  # 睡眠を記録中か（device-sync の session）
         self._loop: Optional[asyncio.AbstractEventLoop] = None
 
         self.uplink = Uplink(self.outbox, self.api, config.FIRMWARE_VERSION, self._egg_info)
@@ -200,6 +204,8 @@ class ChickenApp:
         if result.outcome is not Outcome.OK or not isinstance(result.body, dict):
             return  # 前に受け取ったアラームのまま（Wi-Fi が切れても鳴る）
 
+        session = result.body.get("session")
+        self._session_active = isinstance(session, dict) and session.get("status") == "in_progress"
         alarm = result.body.get("alarm") or {}
         self.alarm.set_target(parse_time(alarm.get("ring_at")))
         self.voice = (result.body.get("settings") or {}).get("character_voice") or "rooster"
@@ -211,14 +217,18 @@ class ChickenApp:
         for announcement in result.body.get("announcements") or []:
             text = announcement.get("text")
             if text:
-                asyncio.create_task(self._say(text))
+                asyncio.create_task(self._say(text, announcement.get("kind")))
 
-    async def _say(self, text: str) -> None:
+    async def _say(self, text: str, kind: Optional[str] = None) -> None:
         """サーバーで声にして流す（夕方の提案・朝のコメント）。作れなければ合図の音"""
-        wav = await asyncio.to_thread(self.api.speak, text)
-        self.led.set(GOLD)
-        await self.speaker.play(wav or tone_wav())
-        self.led.set(OFF)
+        self._speaking_kind = kind
+        try:
+            wav = await asyncio.to_thread(self.api.speak, text)
+            self.led.set(GOLD)
+            await self.speaker.play(wav or tone_wav())
+            self.led.set(OFF)
+        finally:
+            self._speaking_kind = None
 
     # ------------------------------------------------------------ 1秒ごと
 
@@ -293,7 +303,15 @@ class ChickenApp:
 
     def _display_state(self) -> DisplayState:
         ringing = self.alarm.ringing
-        return DisplayState(expression="wake" if ringing else "normal", busy=self._busy_talking, alarm_ringing=ringing)
+        expression = choose_expression(
+            alarm_ringing=ringing,
+            talk_phase=self._talk_phase,
+            speaking_kind=self._speaking_kind,
+            session_active=self._session_active,
+            hour=datetime.datetime.now().hour,
+            evening_hour=config.EVENING_SLEEPY_HOUR,
+        )
+        return DisplayState(expression=expression, busy=self._busy_talking, alarm_ringing=ringing)
 
     async def _display_loop(self) -> None:
         """状態を画面（別プロセス）に渡し、画面から届いた操作を受け取る。画面が動いていなくても本体は止まらない"""
@@ -322,11 +340,13 @@ class ChickenApp:
     async def _talk(self) -> None:
         self._busy_talking = True
         logger.info("会話を始めます（録音）")
+        self._talk_phase = TALK_LISTEN
         try:
             self.led.set(LISTENING)
             wav = await asyncio.to_thread(self.recorder.record)
             if wav is None:
                 return
+            self._talk_phase = TALK_THINK
             self.led.set(GOLD)
             reply = await asyncio.to_thread(self.api.voice_chat, wav, self.chat_session_id) if self.api.configured else None
             if reply is None:
@@ -340,4 +360,5 @@ class ChickenApp:
             logger.exception("会話でエラーが起きました")
         finally:
             self.led.set(OFF)
+            self._talk_phase = None
             self._busy_talking = False

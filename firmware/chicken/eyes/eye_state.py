@@ -17,6 +17,9 @@ class Expression(Enum):
     SLEEPY = "sleepy"  # 眠い（就寝前）
     HAPPY = "happy"  # うれしい（朝のスコアが高いとき）
     WAKE = "wake"  # 起こす（アラーム中）
+    LISTEN = "listen"  # 聞いている（会話の録音中）
+    THINK = "think"  # 考え中（返事を待っている）
+    SLEEP = "sleep"  # 眠り（睡眠を記録中）
 
 
 @dataclass(frozen=True)
@@ -37,6 +40,9 @@ EXPRESSIONS: dict[Expression, ExpressionParams] = {
     Expression.SLEEPY: ExpressionParams(0.42, 0.0, 0.95, 0.9, 0.45, 0.6, 0.35, 0.0),
     Expression.HAPPY: ExpressionParams(0.0, 1.0, 1.0, 1.0, 1.0, 1.4, 0.4, 0.0),
     Expression.WAKE: ExpressionParams(0.0, 0.0, 1.12, 0.75, 1.4, 0.8, 0.5, 0.05),
+    Expression.LISTEN: ExpressionParams(0.0, 0.0, 1.08, 1.15, 0.8, 1.6, 0.15, 0.0),  # 目を大きく、視線は動かさず、まばたき少なめ
+    Expression.THINK: ExpressionParams(0.18, 0.0, 0.98, 0.8, 0.8, 0.7, 1.8, 0.0),  # 少し目を細め、視線をきょろきょろさせる
+    Expression.SLEEP: ExpressionParams(0.9, 0.0, 0.9, 0.9, 0.3, 4.0, 0.0, 0.0),  # ほぼ閉じる。まばたきも視線もほとんどしない
 }
 
 BLINK_INTERVAL_SEC = (2.5, 6.0)  # まばたきの間隔（この範囲でランダム、blink_gap を掛ける）

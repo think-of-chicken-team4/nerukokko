@@ -8,7 +8,7 @@
 
     python3 -m eyes.eye_display --link                   # 本体（app.py）と連携：状態を読み、タッチでメニュー・会話開始
 
-連携なしのときのキー：1=通常 2=眠い 3=うれしい 4=起こす、5=昼 6=夜 7=時刻で自動、Esc か Q で終了。
+連携なしのときのキー：1=通常 2=眠い 3=うれしい 4=起こす 8=聞いている 9=考え中 0=眠り、5=昼 6=夜 7=時刻で自動、Esc か Q で終了。
 実機で調整する値（色・大きさ・位置）は下の定数にまとめている（Issue #28）。
 """
 
@@ -79,6 +79,9 @@ KEY_TO_EXPRESSION = {
     pygame.K_2: Expression.SLEEPY,
     pygame.K_3: Expression.HAPPY,
     pygame.K_4: Expression.WAKE,
+    pygame.K_8: Expression.LISTEN,
+    pygame.K_9: Expression.THINK,
+    pygame.K_0: Expression.SLEEP,
 }
 
 
