@@ -211,8 +211,7 @@ def run(windowed: bool, expression: Expression, darkness: float | None, link: bo
                 state.set_expression(_expression_of(received))
             menu.tick(now, link_state)
         if auto:
-            # アラーム中は画面を明るくして光でも起こす。照度センサーの値は、連携時に lux= で渡す
-            ambient.update(now, hour=datetime.datetime.now().hour, wake=link_state.alarm_ringing)
+            ambient.update(now, hour=datetime.datetime.now().hour)  # 照度センサーの値は、連携時に lux= で渡す
         if link and menu.screen is Screen.MENU:
             draw_menu(screen, link_state, ambient.value, fonts, has_jp)
         else:
