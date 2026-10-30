@@ -86,7 +86,7 @@ Google Cloud のプロジェクトを作るだけなら、請求先アカウン�
    ```
    `secrets list` に `GEMINI_API_KEY` があれば OK（値は表示されない）。Google の値は §3 のあとで `.env` に書いてから、同じコマンドをもう一度実行する。
    `GOOGLE_REDIRECT_URIS` は §5 で Vercel の URL が決まってから入れる（§6）。
-5. 定期実行（記録の自動締め・夕方の提案）のために、ダッシュボードの「SQL Editor」で次を実行する。secret キーは「Project Settings」→「API Keys」の **secret** キー（`sb_secret_…`）。実行したら、SQL Editor のタブからキーを消す（保存したクエリに残さない）。ジョブがあるかは `select jobname, schedule, active from cron.job;` で確かめる。
+5. 定期実行（記録の自動締め・夕方の提案）のために、ダッシュボードの「SQL Editor」で次を実行する。secret キーは「Project Settings」→「API Keys」の **secret** キー（`sb_secret_…`）。**SQL Editor は書いた SQL を自動で保存する**（左の「PRIVATE」に「Untitled query」として残る）ので、実行したら**キーを書いたクエリを削除する**。ジョブがあるかは `select jobname, schedule, active from cron.job;`（2つ出る）、関数を呼べているかは `select status_code, created from net._http_response order by created desc limit 5;`（200 があれば OK。10分ごとに増える）で確かめる。
    ```sql
    select vault.create_secret('https://<Reference ID>.supabase.co', 'project_url');
    select vault.create_secret('<secret キー>', 'secret_key');
