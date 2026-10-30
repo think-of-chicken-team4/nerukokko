@@ -13,9 +13,10 @@
   --color-pink: #f0879a;
   --color-sky: #8fb8d6;
 
-  --font-sans: var(--font-noto-sans-jp), "Hiragino Sans", "Yu Gothic", sans-serif;
-  --font-maru: var(--font-zen-maru), var(--font-noto-sans-jp), sans-serif;
-  --font-num: var(--font-space-grotesk), var(--font-noto-sans-jp), sans-serif;
+  /* フォントの読み込みは layout.tsx（Fontsource） */
+  --font-sans: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --font-maru: "Zen Maru Gothic", "Noto Sans JP", sans-serif;
+  --font-num: "Space Grotesk", "Noto Sans JP", sans-serif;
 }
 
 /* ---------- 時間帯（フェーズ）ごとの背景と文字色 ---------- */
