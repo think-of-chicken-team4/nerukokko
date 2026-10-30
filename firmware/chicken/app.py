@@ -301,7 +301,10 @@ class ChickenApp:
         while True:
             try:
                 write_state(config.DISPLAY_STATE_PATH, self._display_state())
-                if receiver.poll() == COMMAND_TALK:
+                command = receiver.poll()
+                if command is not None:
+                    logger.info("画面から操作を受け取りました：%s", command)
+                if command == COMMAND_TALK:
                     self._on_talk_requested()
             except Exception:
                 logger.exception("画面との連携でエラーが起きました")
@@ -312,11 +315,13 @@ class ChickenApp:
             logger.info("アラーム中の会話は始めません（たまごを巣に戻すと止まる）")
             return
         if self._busy_talking:
+            logger.info("会話の最中なので、新しい「話す」は始めません")
             return
         asyncio.create_task(self._talk())
 
     async def _talk(self) -> None:
         self._busy_talking = True
+        logger.info("会話を始めます（録音）")
         try:
             self.led.set(LISTENING)
             wav = await asyncio.to_thread(self.recorder.record)
