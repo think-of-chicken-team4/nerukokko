@@ -42,7 +42,7 @@ EXPRESSIONS: dict[Expression, ExpressionParams] = {
     Expression.WAKE: ExpressionParams(0.0, 0.0, 1.12, 0.75, 1.4, 0.8, 0.5, 0.05),
     Expression.LISTEN: ExpressionParams(0.0, 0.0, 1.08, 1.15, 0.8, 1.6, 0.15, 0.0),  # 目を大きく、視線は動かさず、まばたき少なめ
     Expression.THINK: ExpressionParams(0.18, 0.0, 0.98, 0.8, 0.8, 0.7, 1.8, 0.0),  # 少し目を細め、視線をきょろきょろさせる
-    Expression.SLEEP: ExpressionParams(0.9, 0.0, 0.9, 0.9, 0.3, 4.0, 0.0, 0.0),  # ほぼ閉じる。まばたきも視線もほとんどしない
+    Expression.SLEEP: ExpressionParams(1.0, 0.0, 0.9, 0.9, 0.3, 4.0, 0.0, 0.0),  # 閉じた線で描く（eye_display の CLOSED_LID）。まばたきも視線もしない
 }
 
 BLINK_INTERVAL_SEC = (2.5, 6.0)  # まばたきの間隔（この範囲でランダム、blink_gap を掛ける）

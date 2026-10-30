@@ -52,6 +52,8 @@ GAZE_MAX_OFFSET = 0.12  # 目の大きさに対する視線のずれの最大割
 SMILE_CUT_SHIFT = 0.22  # 笑い目：下から切り取る楕円を、目の高さの何割ずらすか（小さいほど細い三日月）
 SMILE_RECENTER = 0.2  # 笑い目のとき、目全体を下げる量（目の高さに対する割合）
 SMILE_HIDE_PUPIL = 0.25  # 笑いがこの値を超えたら瞳を描かない
+CLOSED_LID = 0.8  # まぶたがこれを超えたら、目を閉じた線で描く（眠り）
+CLOSED_LINE_HEIGHT_RATIO = 0.035  # 閉じた目の線の太さ（画面の高さに対する割合）
 
 Color = tuple[int, int, int]
 
@@ -63,6 +65,7 @@ class Palette:
         self.background = _mix(DAY_BACKGROUND, NIGHT_BACKGROUND, darkness)
         self.eye = _mix(DAY_EYE, NIGHT_EYE, darkness)
         self.pupil = _mix(DAY_PUPIL, NIGHT_PUPIL, darkness)
+        self.closed_line = _mix(DAY_PUPIL, NIGHT_EYE, darkness)  # 閉じた目の線：昼は暗い色、夜は明るい色（背景と区別できるように）
 
 
 def _mix(day: Color, night: Color, darkness: float) -> Color:
@@ -102,6 +105,12 @@ def draw_eyes(surface: pygame.Surface, frame: EyeFrame, darkness: float = 1.0) -
 def _draw_one_eye(
     surface: pygame.Surface, cx: int, cy: int, w: int, h: int, full_h: int, frame: EyeFrame, palette: Palette
 ) -> None:
+    if frame.lid > CLOSED_LID:
+        line_h = max(MIN_VISIBLE_HEIGHT, int(surface.get_height() * CLOSED_LINE_HEIGHT_RATIO))
+        line = pygame.Rect(0, 0, w, line_h)
+        line.center = (cx, cy + full_h // 8)  # 目の中心より少し下に、閉じた線を引く
+        pygame.draw.rect(surface, palette.closed_line, line, border_radius=line_h // 2)
+        return
     rect = pygame.Rect(0, 0, w, h)
     rect.center = (cx, cy)
     pygame.draw.ellipse(surface, palette.eye, rect)
