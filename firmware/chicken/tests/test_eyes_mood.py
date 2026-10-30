@@ -26,6 +26,9 @@ class ChooseExpressionTest(unittest.TestCase):
         self.assertEqual(choose(session_active=True), "sleep")
         self.assertEqual(choose(hour=21), "sleepy")
         self.assertEqual(choose(hour=20), "normal")
+        self.assertEqual(choose(hour=0), "sleepy")  # 夜中も眠い目のまま
+        self.assertEqual(choose(hour=5), "sleepy")
+        self.assertEqual(choose(hour=6), "normal")
 
     def test_evening_suggestion_does_not_make_happy(self) -> None:
         self.assertEqual(choose(speaking_kind="evening_suggestion"), "normal")

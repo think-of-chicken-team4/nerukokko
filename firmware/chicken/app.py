@@ -310,6 +310,7 @@ class ChickenApp:
             session_active=self._session_active,
             hour=datetime.datetime.now().hour,
             evening_hour=config.EVENING_SLEEPY_HOUR,
+            morning_hour=config.MORNING_AWAKE_HOUR,
         )
         return DisplayState(expression=expression, busy=self._busy_talking, alarm_ringing=ringing)
 

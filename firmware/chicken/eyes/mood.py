@@ -1,6 +1,6 @@
 """鶏の状態から、目の表情を選ぶ（描画に依存しない）。docs/dsi-display-spec.md §3。
 
-優先順位：アラーム > 会話（聞いている・考え中） > 朝のコメント（うれしい） > 記録中（眠り） > 夕方以降（眠い） > 通常
+優先順位：アラーム > 会話（聞いている・考え中） > 朝のコメント（うれしい） > 記録中（眠り） > 夜（眠い） > 通常
 """
 
 from __future__ import annotations
@@ -21,8 +21,10 @@ def choose_expression(
     session_active: bool,
     hour: int,
     evening_hour: int,
+    morning_hour: int = 6,
 ) -> str:
-    """eye_state.Expression の値（文字列）を返す。hour は 0〜23（鶏の時計の現地時刻）"""
+    """eye_state.Expression の値（文字列）を返す。hour は 0〜23（鶏の時計の現地時刻）。
+    evening_hour 時から翌 morning_hour 時の前までを夜（眠い）とする"""
     if alarm_ringing:
         return "wake"
     if talk_phase == TALK_LISTEN:
@@ -33,6 +35,6 @@ def choose_expression(
         return "happy"
     if session_active:
         return "sleep"
-    if hour >= evening_hour:
+    if hour >= evening_hour or hour < morning_hour:
         return "sleepy"
     return "normal"

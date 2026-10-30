@@ -33,7 +33,6 @@ logger = logging.getLogger(__name__)
 
 # 実機で調整する値
 SCREEN_SIZE = MENU_SCREEN_SIZE  # 5インチ DSI ディスプレイ（800×480。メニューのボタン位置もこの大きさが前提）
-FPS = 60
 # 夜の配色：暗い背景に明るい目（寝室でまぶしくない）
 NIGHT_BACKGROUND = (16, 20, 24)
 NIGHT_EYE = (240, 236, 224)
@@ -218,7 +217,7 @@ def run(windowed: bool, expression: Expression, darkness: float | None, link: bo
         else:
             draw_eyes(screen, state.update(now), ambient.value)
         pygame.display.flip()
-        clock.tick(FPS)
+        clock.tick(config.DISPLAY_FPS)
     pygame.quit()
 
 

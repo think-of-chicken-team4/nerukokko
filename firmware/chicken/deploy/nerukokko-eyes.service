@@ -9,8 +9,9 @@ Wants=graphical.target
 [Service]
 User=EYES_USER
 WorkingDirectory=/opt/nerukokko/firmware/chicken
-# 設定は本体と同じファイル（root だけが読めるが、systemd が読んで渡す。画面には DEVICE_TOKEN などは使わない）
+# 設定は本体と同じファイル（root だけが読めるが、systemd が読んで渡す）。画面は使わない秘密の値は、渡す前に消す
 EnvironmentFile=/etc/nerukokko/chicken.env
+UnsetEnvironment=DEVICE_TOKEN
 Environment=DISPLAY_DIR=/run/nerukokko
 # Wayland（labwc）の上の Xwayland に、:0 でつなぐ
 Environment=DISPLAY=:0
