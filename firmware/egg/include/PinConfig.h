@@ -6,8 +6,9 @@
 #include <cstdint>
 
 // ===== PDM マイク（ADA-4346）=====
-constexpr int PDM_CLK_PIN = 32;
-constexpr int PDM_DATA_PIN = 33;
+// ESPr Developer 32 は、GPIO32・33 が発振子専用で使えない（スイッチサイエンスの製品ページ）。そのため 25・26 を使う（E2）
+constexpr int PDM_CLK_PIN = 25;
+constexpr int PDM_DATA_PIN = 26;
 constexpr uint32_t AUDIO_SAMPLE_RATE_HZ = 16000;
 constexpr uint32_t AUDIO_NOTIFY_INTERVAL_MS = 300;  // 音量を鶏へ送る間隔（0.2〜0.5秒ごと）
 
