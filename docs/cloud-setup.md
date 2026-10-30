@@ -91,6 +91,11 @@ Google Cloud のプロジェクトを作るだけなら、請求先アカウン�
    select vault.create_secret('https://<Reference ID>.supabase.co', 'project_url');
    select vault.create_secret('<secret キー>', 'secret_key');
    ```
+   **`<Reference ID>` と `<secret キー>` は、`< >` ごと本当の値に書き換えてから実行する**（そのまま入れると、ジョブが `invalid URL` で失敗し続ける。10/30 に一度あった）。入れ間違えたときは `vault.update_secret` で直す：
+   ```sql
+   select vault.update_secret((select id from vault.secrets where name = 'project_url'), 'https://<Reference ID>.supabase.co');
+   ```
+   値の形は `select name, left(decrypted_secret, 10), length(decrypted_secret) from vault.decrypted_secrets;` で確かめられる（キーは先頭10文字しか出ない）。ジョブの失敗の理由は `select status, return_message from cron.job_run_details order by start_time desc limit 5;`。
 6. 「Authentication」→「Sign In / Providers」のページの一番上の「**User Signups**」で、**「Confirm email」をオフ**にして保存する（「Allow new users to sign up」はオンのまま）。標準のメール送信は制限が厳しく、メンバーに確認メールが届かないことがあるため。※「Email」を押して開くパネルの中にはない。
 7. Webアプリに入れる値をメモする：
    - Project URL：`https://<Reference ID>.supabase.co`。「Project Settings」→「Data API」に出る URL は `…/rest/v1/` が付いているので、**末尾の `/rest/v1/` を取る**（付けたままだと Webアプリが Supabase につながらない）。
