@@ -13,6 +13,7 @@
 | 4 | Supabase のクラウドのプロジェクト | **済み（10/30）** | GitHub アカウント |
 | 5 | Vercel（Webアプリの公開） | **済み（10/30）**：https://nerukokko.vercel.app | GitHub アカウント |
 | 6 | 公開したあとの設定（Google・鶏） | Supabase の URL 設定は済み（10/30）。Google・鶏はこれから | |
+| 9 | main にマージしたら Supabase にも自動で反映する（GitHub Actions） | §4 のあと（1回だけ設定） | GitHub のリポジトリの管理権限 |
 
 秘密の値は、**Git・Issue・PR・チャットに貼らない**（リポジトリは PUBLIC）。入れる場所は、ローカルなら `server/supabase/functions/.env`、本番なら `npx supabase secrets set`（Supabase）と Vercel の環境変数だけです。
 
@@ -146,3 +147,34 @@ Hobby プラン（無料）で作ります。
 4. 設定 →「デバイスシミュレーターを開く」→「▶ デモを始める」（最後に「デモが終わりました」）
 5. ホームに睡眠スコアとにわとりのコメント、「記録」にグラフが出る
 6. 設定 →「カレンダー連携」は、§3 をするまで「準備中」と出る（正常）
+
+## 9. main にマージしたら Supabase にも自動で反映する（GitHub Actions）
+
+公開したあとの更新は次のとおり。
+
+| 変えたもの | 公開のしかた |
+|---|---|
+| Webアプリ（`app/`） | main にマージすると **Vercel** が自動で作り直して公開する |
+| DB（`server/supabase/migrations/`）・関数（`server/supabase/functions/`）・`config.toml` | main にマージすると **GitHub Actions**（`.github/workflows/deploy-supabase.yml`「Supabase に公開」）が、テストのあとに `db push` と `functions deploy` を自動で行う |
+| 関数の秘密の値（`GEMINI_API_KEY` など）・Vault | **手で行う**（§4-4・§4-5）。新しいキーを足したら `npx supabase secrets set` を忘れない |
+
+### 最初に1回だけ行う設定（田村さん）
+
+1. **Supabase のアクセストークンを作る**：https://supabase.com/dashboard/account/tokens →「Generate new token」。名前は `github-actions-nerukokko`。表示されたトークン（`sbp_…`）をコピーする（**一度しか表示されない**。チャットに貼らない）。
+2. **GitHub に登録する**：リポジトリ（think-of-chicken-team4/nerukokko）の「Settings」→「Secrets and variables」→「Actions」。
+   - 「Secrets」タブ →「New repository secret」で2つ：
+     - `SUPABASE_ACCESS_TOKEN`：1 のトークン
+     - `SUPABASE_DB_PASSWORD`：§4-1 で作ったデータベースのパスワード
+   - 「Variables」タブ →「New repository variable」で1つ：
+     - `SUPABASE_PROJECT_ID`：`puvcjmwneebkhtyhwyfn`（Reference ID。秘密ではない）
+   - 「Settings」が見えないときは、リポジトリの管理権限（Admin）が必要。組織のオーナーに頼む。
+3. **試しに動かす**：リポジトリの「Actions」→ 左の「Supabase に公開」→「Run workflow」→「Run workflow」。緑のチェックになれば OK（新しいマイグレーションがなければ「Remote database is up to date」、関数は全部公開し直される）。
+
+`SUPABASE_PROJECT_ID` を登録するまでは、このワークフローは動かずに飛ばされる（マージが失敗にはならない）。
+
+### 気をつけること
+
+- **マイグレーションは main にマージした時点で本番の DB に入る**。適用済みのマイグレーションは書き換えない（CLAUDE.md §8）。失敗したら Actions の画面が赤くなり、GitHub からメールが来る。ログを Claude に見せる。
+- 本番の DB に入ったマイグレーションは元に戻せない。消す・変える変更は、新しいマイグレーションで行う。
+- PR では動かない（秘密の値を PR のコードに渡さないため）。PR の CI（`ci.yml`）で、同じテストが通ることを確かめる。
+- Vercel（画面）と Supabase（DB・関数）は別々に公開されるので、マージ直後の1〜2分は、片方だけ新しいことがある。
