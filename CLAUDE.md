@@ -168,6 +168,7 @@ cd firmware/egg && pio run
 ```
 
 PR を出すと、GitHub Actions（`.github/workflows/ci.yml`）が Webアプリ・バックエンド（DB・関数）・たまご・鶏のチェックを自動で行う。
+**main にマージすると本番に自動で反映される**：Webアプリは Vercel（https://nerukokko.vercel.app）、DB のマイグレーションと Edge Functions は GitHub Actions（`.github/workflows/deploy-supabase.yml`）が Supabase に反映する。関数の秘密の値と Vault だけは手で設定する（`docs/cloud-setup.md` §4・§9）。
 
 - マイグレーションを追加・変更したら、`npm run test:db` を通し、必要ならテスト（`server/tests/db/schema.test.mjs`）も追加する。
 - 適用済みのマイグレーションファイルは書き換えず、変更は新しいファイルで行う（本番 DB と履歴がずれるため）。
