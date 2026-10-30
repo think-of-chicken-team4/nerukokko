@@ -16,6 +16,7 @@ import asyncio
 import datetime
 import hashlib
 import logging
+import threading
 import time
 from pathlib import Path
 from typing import Optional
@@ -26,7 +27,7 @@ from api_client import ApiClient, Outcome
 from detectors import BreathingAggregator, SoundConfig, SoundDetector, TurnConfig, TurnDetector
 from egg_link import EggLink
 from environment_sensor import EnvironmentReading, EnvironmentSensor
-from eyes.ipc import COMMAND_TALK, CommandReceiver, DisplayState, write_state
+from eyes.ipc import COMMAND_STOP_RECORDING, COMMAND_TALK, CommandReceiver, DisplayState, write_state
 from eyes.mood import TALK_LISTEN, TALK_THINK, choose_expression
 from hardware import GOLD, LISTENING, OFF, Led, Recorder, Speaker, tone_wav
 from outbox import Outbox, iso
@@ -99,6 +100,7 @@ class ChickenApp:
         self.chat_session_id: Optional[str] = None
         self._ring_stop: Optional[asyncio.Event] = None
         self._busy_talking = False
+        self._record_stop = threading.Event()  # 画面の「話し終わった」で立つ（録音をすぐ止める）
         self._talk_phase: Optional[str] = None  # 会話の段階（表情用）：録音中・返事待ち
         self._speaking_kind: Optional[str] = None  # お知らせを話している間の kind（表情用）
         self._session_active = False  # 睡眠を記録中か（device-sync の session）
@@ -312,7 +314,9 @@ class ChickenApp:
             evening_hour=config.EVENING_SLEEPY_HOUR,
             morning_hour=config.MORNING_AWAKE_HOUR,
         )
-        return DisplayState(expression=expression, busy=self._busy_talking, alarm_ringing=ringing)
+        return DisplayState(
+            expression=expression, busy=self._busy_talking, alarm_ringing=ringing, talk_phase=self._talk_phase
+        )
 
     async def _display_loop(self) -> None:
         """状態を画面（別プロセス）に渡し、画面から届いた操作を受け取る。画面が動いていなくても本体は止まらない"""
@@ -325,6 +329,9 @@ class ChickenApp:
                     logger.info("画面から操作を受け取りました：%s", command)
                 if command == COMMAND_TALK:
                     self._on_talk_requested()
+                elif command == COMMAND_STOP_RECORDING and self._talk_phase == TALK_LISTEN:
+                    logger.info("「話し終わった」を受け取りました。録音を止めます")
+                    self._record_stop.set()
             except Exception:
                 logger.exception("画面との連携でエラーが起きました")
             await asyncio.sleep(config.DISPLAY_POLL_SEC)
@@ -342,9 +349,10 @@ class ChickenApp:
         self._busy_talking = True
         logger.info("会話を始めます（録音）")
         self._talk_phase = TALK_LISTEN
+        self._record_stop.clear()
         try:
             self.led.set(LISTENING)
-            wav = await asyncio.to_thread(self.recorder.record)
+            wav = await asyncio.to_thread(self.recorder.record, self._record_stop)
             if wav is None:
                 return
             self._talk_phase = TALK_THINK

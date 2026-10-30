@@ -141,24 +141,30 @@ def _draw_pupil(
 
 # メニューの文字。日本語フォントがないときは英字で代用する（ラズパイには fonts-noto-cjk を入れる）
 FONT_CANDIDATES = "notosanscjkjp,notosansjp,notosanscjk,takaogothic,ipagothic,ipaexgothic,droidsansfallback,vlgothic"
-MENU_TEXT = {"talk": ("話す", "TALK"), "busy": ("会話中…", "..."), "back": ("もどる", "BACK")}
+MENU_TEXT = {
+    "talk": ("話す", "TALK"),
+    "stop": ("話し終わった", "DONE"),  # 録音中は「話す」が、これに変わる
+    "think": ("考え中…", "..."),
+    "back": ("もどる", "BACK"),
+}
 
 
-def load_fonts() -> tuple[tuple[pygame.font.Font, pygame.font.Font], bool]:
-    """((大きい文字, 小さい文字), 日本語が出るか)"""
+def load_fonts() -> tuple[tuple[pygame.font.Font, pygame.font.Font, pygame.font.Font], bool]:
+    """((大きい文字, 小さい文字, 長い文言用の中くらいの文字), 日本語が出るか)"""
     path = pygame.font.match_font(FONT_CANDIDATES)
-    return (pygame.font.Font(path, 110), pygame.font.Font(path, 52)), path is not None
+    return (pygame.font.Font(path, 110), pygame.font.Font(path, 52), pygame.font.Font(path, 78)), path is not None
 
 
-def draw_menu(surface: pygame.Surface, state: DisplayState, darkness: float, fonts: tuple[pygame.font.Font, pygame.font.Font], has_jp: bool) -> None:
-    """fonts は (大きい文字, 小さい文字)。「話す」は大きく、「もどる」は小さく"""
+def draw_menu(surface: pygame.Surface, state: DisplayState, darkness: float, fonts: tuple[pygame.font.Font, ...], has_jp: bool) -> None:
+    """fonts は (大きい文字, 小さい文字, 中くらいの文字)。「話す」は大きく、「話し終わった」は中くらい、「もどる」は小さく"""
     palette = Palette(darkness)
     surface.fill(palette.background)
     label_color = palette.pupil
-    talk_text = MENU_TEXT["busy" if state.busy else "talk"][0 if has_jp else 1]
-    talk_fill = _mix(palette.eye, palette.background, 0.6) if state.busy else palette.eye  # 会話中は薄くして押せないと示す
+    key = "talk" if not state.busy else ("stop" if state.talk_phase == "listen" else "think")
+    talk_text = MENU_TEXT[key][0 if has_jp else 1]
+    talk_fill = _mix(palette.eye, palette.background, 0.6) if key == "think" else palette.eye  # 返事待ちは薄くして押せないと示す
     back_text = MENU_TEXT["back"][0 if has_jp else 1]
-    for rect, text, fill, font in ((TALK_BUTTON, talk_text, talk_fill, fonts[0]), (BACK_BUTTON, back_text, palette.eye, fonts[1])):
+    for rect, text, fill, font in ((TALK_BUTTON, talk_text, talk_fill, fonts[2] if key == "stop" else fonts[0]), (BACK_BUTTON, back_text, palette.eye, fonts[1])):
         box = pygame.Rect(rect)
         pygame.draw.rect(surface, fill, box, border_radius=40)
         label = font.render(text, True, label_color)

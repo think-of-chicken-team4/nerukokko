@@ -152,7 +152,7 @@ class Speaker:
 class Recorder:
     """画面で「話す」をタップしたら録音する。話し終わって MIC_SILENCE_SEC 静かになるか、MIC_MAX_SEC で止める。WAV（16kHz・モノラル・16bit）を返す"""
 
-    def record(self) -> Optional[bytes]:
+    def record(self, stop: Optional[threading.Event] = None) -> Optional[bytes]:
         try:
             import numpy as np
             import sounddevice as sd
@@ -182,7 +182,11 @@ class Recorder:
                 quiet_since = None
             elif heard_voice and quiet_since is None:
                 quiet_since = now
-            if (quiet_since is not None and now - quiet_since >= config.MIC_SILENCE_SEC) or now - started >= config.MIC_MAX_SEC:
+            if (
+                (quiet_since is not None and now - quiet_since >= config.MIC_SILENCE_SEC)
+                or now - started >= config.MIC_MAX_SEC
+                or (stop is not None and stop.is_set())  # 画面の「話し終わった」
+            ):
                 done.set()
 
         device = config.MIC_DEVICE

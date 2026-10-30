@@ -8,6 +8,7 @@ import unittest
 from pathlib import Path
 
 from eyes.ipc import (
+    COMMAND_STOP_RECORDING,
     COMMAND_TALK,
     CommandReceiver,
     CommandSender,
@@ -20,6 +21,8 @@ from eyes.menu import BACK_BUTTON, TALK_BUTTON, MenuState, Screen
 
 NORMAL = DisplayState()
 BUSY = DisplayState(busy=True)
+LISTENING = DisplayState(busy=True, talk_phase="listen")
+THINKING = DisplayState(busy=True, talk_phase="think")
 RINGING = DisplayState(expression="wake", alarm_ringing=True)
 
 
@@ -118,6 +121,20 @@ class MenuTest(unittest.TestCase):
         m.tap(0.0, (400, 240), NORMAL)
         self.assertIsNone(m.tap(1.0, center(TALK_BUTTON), BUSY).command)  # 会話の最中は二重に始めない
         self.assertEqual(m.tick(100.0, BUSY), Screen.MENU)  # 会話の最中は、時間がたってもメニューのまま
+
+    def test_talk_button_stops_recording_while_listening(self) -> None:
+        m = MenuState(timeout_sec=20)
+        m.tap(0.0, (400, 240), NORMAL)
+        self.assertEqual(m.tap(1.0, center(TALK_BUTTON), LISTENING).command, COMMAND_STOP_RECORDING)
+        self.assertIsNone(m.tap(2.0, center(TALK_BUTTON), THINKING).command)  # 返事待ちは何もしない
+
+    def test_talk_phase_roundtrip(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "display.json"
+            write_state(path, LISTENING, now=1000.0)
+            self.assertEqual(read_state(path, now=1001.0, stale_sec=10), LISTENING)
+            write_state(path, NORMAL, now=1000.0)
+            self.assertIsNone(read_state(path, now=1001.0, stale_sec=10).talk_phase)
 
     def test_alarm_ringing_blocks_touch_and_closes_menu(self) -> None:
         m = MenuState(timeout_sec=20)

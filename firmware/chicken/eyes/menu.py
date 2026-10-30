@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, Tuple
 
-from .ipc import COMMAND_TALK, DisplayState
+from .ipc import COMMAND_STOP_RECORDING, COMMAND_TALK, DisplayState
 
 Point = Tuple[int, int]
 Rect = Tuple[int, int, int, int]  # x, y, 幅, 高さ
@@ -61,8 +61,12 @@ class MenuState:
         if contains(BACK_BUTTON, point):
             self.screen = Screen.EYES
             return MenuResult(self.screen)
-        if contains(TALK_BUTTON, point) and not state.busy:
-            return MenuResult(self.screen, COMMAND_TALK)  # 会話の最中は、メニューに残して「話す」だけ無効にする
+        if contains(TALK_BUTTON, point):
+            if not state.busy:
+                return MenuResult(self.screen, COMMAND_TALK)
+            if state.talk_phase == "listen":
+                return MenuResult(self.screen, COMMAND_STOP_RECORDING)  # 録音中は、同じボタンが「話し終わった」になる
+            # 返事待ちのあいだは、メニューに残して何もしない
         return MenuResult(self.screen)
 
     def tick(self, now: float, state: DisplayState) -> Screen:

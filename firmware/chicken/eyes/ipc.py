@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Optional
 
 COMMAND_TALK = "talk"  # 会話を始める（録音 → voice-chat → 返事を再生）
+COMMAND_STOP_RECORDING = "stop_recording"  # 話し終わった（録音をすぐ止めて、返事を待つ）
 
 
 def write_json_atomic(path: Path, data: dict) -> None:
@@ -53,6 +54,7 @@ class DisplayState:
     expression: str = "normal"  # normal / sleepy / happy / wake（eye_state.Expression の値）
     busy: bool = False  # 会話の最中（録音・返事待ち・再生）。メニューの「話す」を押せなくする
     alarm_ringing: bool = False  # アラーム中。タッチでは止めない（二度寝防止）ので、メニューも開かない
+    talk_phase: Optional[str] = None  # 会話の段階：listen（録音中）・think（返事待ち）・None（会話していない）
 
 
 def write_state(path: Path, state: DisplayState, now: Optional[float] = None) -> None:
@@ -61,6 +63,7 @@ def write_state(path: Path, state: DisplayState, now: Optional[float] = None) ->
         "expression": state.expression,
         "busy": state.busy,
         "alarm_ringing": state.alarm_ringing,
+        "talk_phase": state.talk_phase,
     })
 
 
@@ -76,6 +79,7 @@ def read_state(path: Path, now: float, stale_sec: float) -> Optional[DisplayStat
             expression=str(data.get("expression", "normal")),
             busy=bool(data.get("busy", False)),
             alarm_ringing=bool(data.get("alarm_ringing", False)),
+            talk_phase=str(data["talk_phase"]) if data.get("talk_phase") else None,
         )
     except (KeyError, TypeError, ValueError):
         return None
