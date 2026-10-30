@@ -1,6 +1,6 @@
 # クラウドの準備と公開の手順（田村さん向け）
 
-最終更新：2026-10-17　作成：田村（Claude Code と作成）
+最終更新：2026-10-30　作成：田村（Claude Code と作成）
 
 アカウントの作成と、秘密の値（キー・シークレット）の入力は**人（田村さん）が行う**手順です。Claude はアカウントを作ったり、キーを入力したりしません。
 **どのサービスも無料の範囲で使い、クレジットカードは登録しない**（決定ログ 2026-10-16）。途中で「お支払い情報」「請求先アカウント」を求められたら、そこで止めて相談してください。
@@ -10,9 +10,9 @@
 | 1 | Gemini の API キー | 済み（10/16） | Google アカウント |
 | 2 | ローカルでカレンダー連携を試す | **いつでも（T-205 の確認）** | Google アカウント |
 | 3 | Google Cloud の OAuth クライアント（カレンダー連携） | §2 と同時 | Google アカウント |
-| 4 | Supabase のクラウドのプロジェクト | 公開の準備（ステップ6） | GitHub アカウント |
-| 5 | Vercel（Webアプリの公開） | 公開の準備（ステップ6） | GitHub アカウント |
-| 6 | 公開したあとの設定（Google・鶏） | §4・§5 のあと | |
+| 4 | Supabase のクラウドのプロジェクト | **済み（10/30）** | GitHub アカウント |
+| 5 | Vercel（Webアプリの公開） | **済み（10/30）**：https://nerukokko.vercel.app | GitHub アカウント |
+| 6 | 公開したあとの設定（Google・鶏） | Supabase の URL 設定は済み（10/30）。Google・鶏はこれから | |
 
 秘密の値は、**Git・Issue・PR・チャットに貼らない**（リポジトリは PUBLIC）。入れる場所は、ローカルなら `server/supabase/functions/.env`、本番なら `npx supabase secrets set`（Supabase）と Vercel の環境変数だけです。
 
@@ -69,8 +69,9 @@ Google Cloud のプロジェクトを作るだけなら、請求先アカウン�
 無料プランで作ります（2プロジェクトまで。**1週間アクセスがないと一時停止する**ので、そのときはダッシュボードで「Restore」する）。
 
 1. https://supabase.com/dashboard に GitHub アカウントでログインし、「New project」。Organization の Plan は **Free**。名前 `nerukokko`、Region は **Northeast Asia (Tokyo)**、データベースのパスワードは自分で作って安全な場所に保存する。
+   - 「Security」の3つのチェックは**既定のまま**：「Enable Data API」✅、「**Automatically expose new tables」✅（外さない）**、「Enable automatic RLS」はオフ。マイグレーションはテーブルの権限を Supabase の既定に任せているので、2つめを外すとログインした人もテーブルを読めずアプリが動かない（全テーブルに RLS があり、トークンの表は権限を取り上げてあるので安全）。
 2. プロジェクトの「Project Settings」→「General」の **Reference ID** をメモする（秘密ではない）。
-3. 手元で DB と関数をクラウドに入れる（`server/` で実行。途中でデータベースのパスワードを聞かれる）。
+3. 手元で DB と関数をクラウドに入れる（**必ず `server/` フォルダで実行**。別の場所だと `.env` などが見つからない。`link` でデータベースのパスワードを聞かれる）。
    ```bash
    cd server
    npx supabase login
@@ -78,19 +79,22 @@ Google Cloud のプロジェクトを作るだけなら、請求先アカウン�
    npx supabase db push
    npx supabase functions deploy
    ```
-4. 関数の秘密の値を入れる（値はターミナルに直接打つ。チャットに貼らない）。
+4. 関数の秘密の値を入れる。ローカルの `.env` からそのまま入れると、キーを画面に出さずに済む（`server/` で実行）。
    ```bash
-   npx supabase secrets set GEMINI_API_KEY=<Gemini のキー>
-   npx supabase secrets set GOOGLE_CLIENT_ID=<§3 の ID> GOOGLE_CLIENT_SECRET=<§3 のシークレット>
+   npx supabase secrets set --env-file supabase/functions/.env
+   npx supabase secrets list
    ```
+   `secrets list` に `GEMINI_API_KEY` があれば OK（値は表示されない）。Google の値は §3 のあとで `.env` に書いてから、同じコマンドをもう一度実行する。
    `GOOGLE_REDIRECT_URIS` は §5 で Vercel の URL が決まってから入れる（§6）。
-5. 定期実行（記録の自動締め・夕方の提案）のために、ダッシュボードの「SQL Editor」で次を実行する。secret キーは「Project Settings」→「API Keys」の **secret** キー（`sb_secret_…`）。
+5. 定期実行（記録の自動締め・夕方の提案）のために、ダッシュボードの「SQL Editor」で次を実行する。secret キーは「Project Settings」→「API Keys」の **secret** キー（`sb_secret_…`）。**SQL Editor は書いた SQL を自動で保存する**（左の「PRIVATE」に「Untitled query」として残る）ので、実行したら**キーを書いたクエリを削除する**。ジョブがあるかは `select jobname, schedule, active from cron.job;`（2つ出る）、関数を呼べているかは `select status_code, created from net._http_response order by created desc limit 5;`（200 があれば OK。10分ごとに増える）で確かめる。
    ```sql
    select vault.create_secret('https://<Reference ID>.supabase.co', 'project_url');
    select vault.create_secret('<secret キー>', 'secret_key');
    ```
-6. 「Authentication」→「URL Configuration」の Site URL に、§5 の Vercel の URL を入れる（決まってから）。
-7. Webアプリに入れる値をメモする：Project URL（`https://<Reference ID>.supabase.co`）と **publishable** キー（`sb_publishable_…`。公開してよい値）。
+6. 「Authentication」→「Sign In / Providers」のページの一番上の「**User Signups**」で、**「Confirm email」をオフ**にして保存する（「Allow new users to sign up」はオンのまま）。標準のメール送信は制限が厳しく、メンバーに確認メールが届かないことがあるため。※「Email」を押して開くパネルの中にはない。
+7. Webアプリに入れる値をメモする：
+   - Project URL：`https://<Reference ID>.supabase.co`。「Project Settings」→「Data API」に出る URL は `…/rest/v1/` が付いているので、**末尾の `/rest/v1/` を取る**（付けたままだと Webアプリが Supabase につながらない）。
+   - **publishable** キー：「Project Settings」→「API Keys」の Publishable key（`sb_publishable_…`。公開してよい値）。下の Secret keys や「Legacy API Keys」（`eyJ…`）は使わない。
 
 ## 5. Vercel（Webアプリの公開）
 
@@ -98,12 +102,15 @@ Hobby プラン（無料）で作ります。
 
 1. https://vercel.com に GitHub アカウントでログインし、「Add New…」→「Project」→ `think-of-chicken-team4/nerukokko` を Import する（組織のリポジトリが出ないときは、GitHub 側で Vercel のアクセスを許可する）。
 2. **Root Directory** を `app` にする。Framework は Next.js（自動）。
-3. Environment Variables に入れる：
-   - `NEXT_PUBLIC_SUPABASE_URL`：§4-7 の Project URL
+3. Environment Variables に入れる。**種類（Type）は3つとも「Config」**（秘密ではない設定値）にする。`NEXT_PUBLIC_` の付いた値を「Secret」にすると保存できない（「Remove the public framework prefix…」と出る）。**種類は作ったあとで変えられない**ので、間違えたら削除して作り直す。環境は Production（と Preview）。
+   - `NEXT_PUBLIC_SUPABASE_URL`：§4-7 の Project URL（末尾に `/rest/v1/` や `/` を付けない）
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`：§4-7 の publishable キー
-   - `NEXT_PUBLIC_ENABLE_SIMULATOR`：`false`（発表のデモでシミュレーターを使うなら `true`）
+   - `NEXT_PUBLIC_ENABLE_SIMULATOR`：`true`（実機がなくてもメンバーが試せるように。発表の前に `false` にする）
+   - 今の Vercel では、環境変数は「Settings」→「Environments」→「Production」を開いた中にある。
 4. 「Deploy」。できた URL（`https://<名前>.vercel.app`）をメモする。
-5. `main` に変更がマージされるたびに、自動で公開し直される。
+5. `main` に変更がマージされるたびに、自動で公開し直される。**環境変数を変えたときは「Deployments」→「…」→「Redeploy」が必要**（`NEXT_PUBLIC_` の値はビルドのときに埋め込まれる）。
+
+**全ページが「Internal Server Error」になるとき**：Vercel の「Logs」を見る。`Invalid supabaseUrl` なら `NEXT_PUBLIC_SUPABASE_URL` の形が違う（`https://` がない、`/rest/v1/` が付いている、`< >` や空白が残っている）。`URL and Key are required` なら値が入っていない。直して Redeploy する。
 
 ## 6. 公開したあとの設定
 
@@ -112,7 +119,7 @@ Hobby プラン（無料）で作ります。
    ```bash
    npx supabase secrets set GOOGLE_REDIRECT_URIS=https://<名前>.vercel.app/settings/calendar/callback,http://localhost:3000/settings/calendar/callback
    ```
-3. **Supabase**：§4-6 の Site URL に Vercel の URL を入れる。
+3. **Supabase**：「Authentication」→「URL Configuration」の **Site URL** に `https://<名前>.vercel.app`、**Redirect URLs** に `https://<名前>.vercel.app/**` を入れる（10/30 済み）。
 4. **鶏**：公開した Webアプリでアカウントを作り、「デバイス」で鶏を登録してトークンを発行し直す。ラズパイの `/etc/nerukokko/chicken.env` の `SUPABASE_URL`・`SUPABASE_PUBLISHABLE_KEY`・`DEVICE_TOKEN` を本番の値にして `sudo systemctl restart nerukokko-chicken`（`firmware/chicken/README.md`）。
 
 ## 7. お金がかからないことの確認
@@ -123,3 +130,14 @@ Hobby プラン（無料）で作ります。
 | Google Cloud（Calendar API） | 無料 | 請求先アカウントを作らない |
 | Supabase | Free | 1週間使わないと一時停止。DB 500MB・関数の呼び出し 50万回/月まで |
 | Vercel | Hobby | 商用は不可（授業の発表は問題ない） |
+
+## 8. 公開した後の確認（10/30 に全部できた）
+
+公開した Webアプリで、新しいアカウントを作って順に試す。
+
+1. 新規登録（確認メールなしでホームに入れる）
+2. 設定でアラームを追加
+3. チャットで一言送る（にわとりから返事が来る＝Gemini が動いている）
+4. 設定 →「デバイスシミュレーターを開く」→「▶ デモを始める」（最後に「デモが終わりました」）
+5. ホームに睡眠スコアとにわとりのコメント、「記録」にグラフが出る
+6. 設定 →「カレンダー連携」は、§3 をするまで「準備中」と出る（正常）
