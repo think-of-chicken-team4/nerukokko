@@ -24,6 +24,18 @@ fi
 chmod 600 /etc/nerukokko/chicken.env
 
 install -m 644 "$HERE/deploy/nerukokko-chicken.service" /etc/systemd/system/
+install -m 644 "$HERE/deploy/nerukokko.tmpfiles.conf" /etc/tmpfiles.d/nerukokko.conf
+systemd-tmpfiles --create /etc/tmpfiles.d/nerukokko.conf
+
+# 画面（目・タッチ）：デスクトップにログインしているユーザーで動かす。sudo を実行したユーザーを使う
+EYES_USER="${SUDO_USER:-}"
+if [[ -n "$EYES_USER" && "$EYES_USER" != "root" ]]; then
+  sed "s#EYES_USER#$EYES_USER#g" "$HERE/deploy/nerukokko-eyes.service" > /etc/systemd/system/nerukokko-eyes.service
+  EYES_ENABLED=1
+else
+  echo "（sudo を実行したユーザーが分からないので、画面の自動起動は設定していません。普通のユーザーで sudo を付けて実行してください）"
+  EYES_ENABLED=0
+fi
 if [[ $# -ge 1 ]]; then
   sed "s#ACCONEER_SERVER#$1#" "$HERE/deploy/acconeer-server.service" > /etc/systemd/system/acconeer-server.service
   systemctl enable acconeer-server.service
@@ -34,5 +46,9 @@ fi
 
 systemctl daemon-reload
 systemctl enable nerukokko-chicken.service
-echo "→ 完了。設定ファイルを書いたら：sudo systemctl restart nerukokko-chicken"
-echo "   ログ：journalctl -u nerukokko-chicken -f"
+if [[ "$EYES_ENABLED" == "1" ]]; then
+  systemctl enable nerukokko-eyes.service
+  echo "→ 画面（目・タッチ）を、$EYES_USER で自動起動するようにしました"
+fi
+echo "→ 完了。設定ファイルを書いたら：sudo systemctl restart nerukokko-chicken nerukokko-eyes"
+echo "   ログ：journalctl -u nerukokko-chicken -f ／ journalctl -u nerukokko-eyes -f"

@@ -1,0 +1,26 @@
+# 鶏の画面（目・メニュー・タッチ）を、ラズパイの電源を入れたら自動で起動する（F-10）。deploy/install.sh が /etc/systemd/system/ に入れる。
+# デスクトップ（labwc）にログインしているユーザーで動かす（EYES_USER は install.sh が sudo を実行したユーザーに書き換える）。
+# ログ：journalctl -u nerukokko-eyes -f
+[Unit]
+Description=NeruKokko chicken display (eyes and touch menu)
+After=graphical.target systemd-tmpfiles-setup.service nerukokko-chicken.service
+Wants=graphical.target
+
+[Service]
+User=EYES_USER
+WorkingDirectory=/opt/nerukokko/firmware/chicken
+# 設定は本体と同じファイル（root だけが読めるが、systemd が読んで渡す）。画面は使わない秘密の値は、渡す前に消す
+EnvironmentFile=/etc/nerukokko/chicken.env
+UnsetEnvironment=DEVICE_TOKEN
+Environment=DISPLAY_DIR=/run/nerukokko
+# Wayland（labwc）の上の Xwayland に、:0 でつなぐ
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/EYES_USER/.Xauthority
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/nerukokko/firmware/chicken/.venv/bin/python -m eyes.eye_display --link
+# デスクトップがまだ立ち上がっていないと、最初はつながらない。つながるまで繰り返す
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical.target

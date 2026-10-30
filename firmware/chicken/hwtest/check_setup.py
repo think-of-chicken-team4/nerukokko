@@ -38,7 +38,7 @@ PYTHON_PACKAGES = {
     "numpy": "計算",
     "sounddevice": "マイク・スピーカー",
     "smbus2": "I2C センサー",
-    "gpiozero": "トサカボタン",
+    "pygame": "画面（目・メニュー）",
     "rpi_ws281x": "LED（WS2812B）",
     "acconeer.exptool": "ミリ波レーダー（A111）",
     "requests": "サーバー通信",

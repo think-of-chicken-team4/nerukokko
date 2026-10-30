@@ -2,7 +2,7 @@
 
 たまごとの BLE、レーダー・温湿度・照度センサー、アラーム（LED・スピーカー）、会話（録音→返事の再生）、サーバーとの通信をまとめて動かします。
 
-> **10/23 の変更**：トサカボタンは取り外し、会話は**タッチディスプレイ（DSI）**から始めるようになりました（`docs/dsi-display-spec.md`）。表示とタッチの部分は岡田さんが開発中です（F-10）。それまでのあいだ、ボタンの処理（`BUTTON_*`）はコードに残っていますが、ボタンをつながなければ何もしません。ディスプレイから会話を始められるようになったら、ボタンの処理は消します。
+> **10/23 の変更**：トサカボタンは廃止し、会話は**タッチディスプレイ（DSI）**から始めます（`docs/dsi-display-spec.md`）。画面（`eyes/`）は本体とは別のプロセスで動き、状態と操作をファイルでやりとりします（`eyes/ipc.py`）。画面が落ちても、アラーム・BLE・送信は止まりません。
 通信の決まりは `docs/api-spec.md`（§3・§6）、たまごとの BLE は `docs/ble-protocol.md`。
 
 **実機で調整する値は、すべて設定ファイル（`/etc/nerukokko/chicken.env`）に書くだけで変えられます。** コードを直す必要はありません（下の「調整する値」）。
@@ -20,7 +20,7 @@
 | `alarm.py` | アラームの時刻（ファイルに保存。Wi-Fi が切れても鳴る） |
 | `radar_sensor.py`・`radar_filter.py` | A111 レーダー（呼吸・在床）。誤検知を防ぐフィルタ |
 | `environment_sensor.py` | 温湿度・照度（つながっているチップを自動で見分ける） |
-| `hardware.py` | LED・スピーカー・録音（トサカボタンは廃止予定）。ないときは何もしない部品になる |
+| `hardware.py` | LED・スピーカー・録音。ないときは何もしない部品になる |
 | `deploy/` | 自動起動（systemd）の設定とインストール用のスクリプト |
 | `tests/` | ハードウェアなしで動くテスト（`python3 -m unittest discover -s tests`） |
 | `hwtest/` | 実機検証のツール（`docs/hw-verification.md`） |
@@ -38,12 +38,12 @@
    ```
 3. **音（マイク・スピーカー）**：C4・C5 で確かめた設定（`/boot/firmware/config.txt` の I2S の dtoverlay）にする。`aplay -L` と `.venv/bin/python hwtest/audio_test.py devices` で名前を確かめ、あとで `AUDIO_OUTPUT_DEVICE`・`MIC_DEVICE` に書く。
 4. **鶏をアカウントに登録する**：鶏で `cat /sys/class/net/wlan0/address` を実行して MAC アドレスを調べ、Webアプリの「デバイス」→「登録してトークンを発行」。表示されたトークンを控える（**一度しか表示されない**）。
-5. **自動起動を入れる**（レーダーの exploration server の場所も指定する）：
+5. **自動起動を入れる**（レーダーの exploration server の場所も指定する）。画面（目・タッチ）は、デスクトップにログインしているふつうのユーザーで `sudo` を付けて実行すると、そのユーザーで自動起動する（日本語の文字は `sudo apt install -y fonts-noto-cjk`）：
    ```bash
    sudo ./deploy/install.sh /home/pi/acconeer/out/acc_exploration_server_a111
    sudo nano /etc/nerukokko/chicken.env   # SUPABASE_URL・SUPABASE_PUBLISHABLE_KEY・DEVICE_TOKEN を書く
-   sudo systemctl restart nerukokko-chicken
-   journalctl -u nerukokko-chicken -f     # 動いているかを見る
+   sudo systemctl restart nerukokko-chicken nerukokko-eyes
+   journalctl -u nerukokko-chicken -f     # 動いているかを見る（画面は nerukokko-eyes）
    ```
 6. **確かめる**：Webアプリの「デバイス」で鶏が「オンライン」になる。たまごの電源を入れると、たまごも出てくる。
 
@@ -60,8 +60,7 @@
 | C4 マイク | `MIC_DEVICE`・`MIC_GAIN`・`MIC_VOICE_LEVEL`・`MIC_SILENCE_SEC` | 既定・1.0・500・1.5 | 会話を始めて話し、話し終わりで録音が止まる値 |
 | C5 スピーカー | `AUDIO_OUTPUT_DEVICE`・`SPEAKER_VOLUME` | 既定・0.8 | 枕元でちょうどよく聞こえる音量 |
 | C6 LED | `LED_PIN`・`LED_COUNT`・`LED_BRIGHTNESS` | 12・2・180 | 配線と、まぶしすぎない明るさ |
-| ~~C7 ボタン~~ | `BUTTON_ENABLED` | true | **不要になった**（10/23）。ボタンを外したら `false` にしておく |
-| D1〜D3 ディスプレイ | （岡田さんが追加する） | — | `docs/dsi-display-spec.md` §5 |
+| D1〜D3 ディスプレイ | `DISPLAY_FPS`・`DISPLAY_POLL_SEC`・`DISPLAY_STALE_SEC`・`MENU_TIMEOUT_SEC`・`EVENING_SLEEPY_HOUR`・`MORNING_AWAKE_HOUR` | 30・0.3・5・20・21・6 | CPU の使用率（D1）を見て `DISPLAY_FPS` を決める。メニューのボタンの大きさ・位置（`eyes/menu.py`）は指で押しやすいか確かめる。`docs/dsi-display-spec.md` §5 |
 | — アラーム | `ALARM_MAX_RING_SEC`・`ALARM_SUNRISE_SEC` | 1800・60 | 好みで |
 
 値を変えたら `sudo systemctl restart nerukokko-chicken`。測った値と決めた値は Issue に残す。

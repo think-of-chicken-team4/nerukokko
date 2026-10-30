@@ -4,7 +4,8 @@
     1秒ごと ：アラームを鳴らすか、寝返り・いびき・呼吸・在床の判定、送るタイミングなら ingest-sensor-data
     60秒ごと：温湿度・照度
     たまごが巣に戻ったら：アラームを止め、charge_start をすぐ送る（起床。サーバーが朝の振り返りを作る）
-    トサカボタン：録音 → voice-chat → 返事を流す
+    画面で「話す」をタップ（eyes プロセスから届く）：録音 → voice-chat → 返事を流す
+    0.3秒ごと：状態（表情・会話中・アラーム中）を画面に渡し、画面からの操作を受け取る
 
 docs/api-spec.md §3・§6、docs/ble-protocol.md。設定は integration_config.py（環境変数）。
 """
@@ -25,13 +26,15 @@ from api_client import ApiClient, Outcome
 from detectors import BreathingAggregator, SoundConfig, SoundDetector, TurnConfig, TurnDetector
 from egg_link import EggLink
 from environment_sensor import EnvironmentReading, EnvironmentSensor
-from hardware import GOLD, LISTENING, OFF, Button, Led, Recorder, Speaker, tone_wav
+from eyes.ipc import COMMAND_TALK, CommandReceiver, DisplayState, write_state
+from eyes.mood import TALK_LISTEN, TALK_THINK, choose_expression
+from hardware import GOLD, LISTENING, OFF, Led, Recorder, Speaker, tone_wav
 from outbox import Outbox, iso
 from uplink import Uplink
 
 logger = logging.getLogger(__name__)
 
-RETRY_PHRASE = "ごめんコケ、うまく聞き取れなかったコケ。もう一回トサカを押して話してほしいコケ。"
+RETRY_PHRASE = "ごめんコケ、うまく聞き取れなかったコケ。もう一回、画面にさわって話してほしいコケ。"
 OFFLINE_PHRASE = "いまインターネットにつながっていないコケ…。少しあとでまた話しかけてほしいコケ。"
 
 
@@ -96,6 +99,9 @@ class ChickenApp:
         self.chat_session_id: Optional[str] = None
         self._ring_stop: Optional[asyncio.Event] = None
         self._busy_talking = False
+        self._talk_phase: Optional[str] = None  # 会話の段階（表情用）：録音中・返事待ち
+        self._speaking_kind: Optional[str] = None  # お知らせを話している間の kind（表情用）
+        self._session_active = False  # 睡眠を記録中か（device-sync の session）
         self._loop: Optional[asyncio.AbstractEventLoop] = None
 
         self.uplink = Uplink(self.outbox, self.api, config.FIRMWARE_VERSION, self._egg_info)
@@ -118,11 +124,9 @@ class ChickenApp:
 
     async def run(self) -> None:
         self._loop = asyncio.get_running_loop()
-        if config.BUTTON_ENABLED:
-            Button(lambda: self._loop.call_soon_threadsafe(self._on_button))
         self.led.set(OFF)
         logger.info("ねるコッコ（鶏）を起動しました：%s", config.FIRMWARE_VERSION)
-        await asyncio.gather(self.egg.run_forever(), self._sync_loop(), self._tick_loop(), self._environment_loop())
+        await asyncio.gather(self.egg.run_forever(), self._sync_loop(), self._tick_loop(), self._environment_loop(), self._display_loop())
 
     # ------------------------------------------------------------ たまご（BLE）から
 
@@ -200,6 +204,8 @@ class ChickenApp:
         if result.outcome is not Outcome.OK or not isinstance(result.body, dict):
             return  # 前に受け取ったアラームのまま（Wi-Fi が切れても鳴る）
 
+        session = result.body.get("session")
+        self._session_active = isinstance(session, dict) and session.get("status") == "in_progress"
         alarm = result.body.get("alarm") or {}
         self.alarm.set_target(parse_time(alarm.get("ring_at")))
         self.voice = (result.body.get("settings") or {}).get("character_voice") or "rooster"
@@ -211,14 +217,18 @@ class ChickenApp:
         for announcement in result.body.get("announcements") or []:
             text = announcement.get("text")
             if text:
-                asyncio.create_task(self._say(text))
+                asyncio.create_task(self._say(text, announcement.get("kind")))
 
-    async def _say(self, text: str) -> None:
+    async def _say(self, text: str, kind: Optional[str] = None) -> None:
         """サーバーで声にして流す（夕方の提案・朝のコメント）。作れなければ合図の音"""
-        wav = await asyncio.to_thread(self.api.speak, text)
-        self.led.set(GOLD)
-        await self.speaker.play(wav or tone_wav())
-        self.led.set(OFF)
+        self._speaking_kind = kind
+        try:
+            wav = await asyncio.to_thread(self.api.speak, text)
+            self.led.set(GOLD)
+            await self.speaker.play(wav or tone_wav())
+            self.led.set(OFF)
+        finally:
+            self._speaking_kind = None
 
     # ------------------------------------------------------------ 1秒ごと
 
@@ -289,23 +299,55 @@ class ChickenApp:
             self._ring_stop = None
             logger.info("アラームを止めました")
 
-    # ------------------------------------------------------------ トサカボタンで話す（F-04）
+    # ------------------------------------------------------------ 画面（eyes）との連携・タッチで話す（F-04・F-10）
 
-    def _on_button(self) -> None:
+    def _display_state(self) -> DisplayState:
+        ringing = self.alarm.ringing
+        expression = choose_expression(
+            alarm_ringing=ringing,
+            talk_phase=self._talk_phase,
+            speaking_kind=self._speaking_kind,
+            session_active=self._session_active,
+            hour=datetime.datetime.now().hour,
+            evening_hour=config.EVENING_SLEEPY_HOUR,
+            morning_hour=config.MORNING_AWAKE_HOUR,
+        )
+        return DisplayState(expression=expression, busy=self._busy_talking, alarm_ringing=ringing)
+
+    async def _display_loop(self) -> None:
+        """状態を画面（別プロセス）に渡し、画面から届いた操作を受け取る。画面が動いていなくても本体は止まらない"""
+        receiver = CommandReceiver(config.DISPLAY_COMMAND_PATH)
+        while True:
+            try:
+                write_state(config.DISPLAY_STATE_PATH, self._display_state())
+                command = receiver.poll()
+                if command is not None:
+                    logger.info("画面から操作を受け取りました：%s", command)
+                if command == COMMAND_TALK:
+                    self._on_talk_requested()
+            except Exception:
+                logger.exception("画面との連携でエラーが起きました")
+            await asyncio.sleep(config.DISPLAY_POLL_SEC)
+
+    def _on_talk_requested(self) -> None:
         if self.alarm.ringing:
-            logger.info("アラーム中のボタンは使いません（たまごを巣に戻すと止まる）")
+            logger.info("アラーム中の会話は始めません（たまごを巣に戻すと止まる）")
             return
         if self._busy_talking:
+            logger.info("会話の最中なので、新しい「話す」は始めません")
             return
         asyncio.create_task(self._talk())
 
     async def _talk(self) -> None:
         self._busy_talking = True
+        logger.info("会話を始めます（録音）")
+        self._talk_phase = TALK_LISTEN
         try:
             self.led.set(LISTENING)
             wav = await asyncio.to_thread(self.recorder.record)
             if wav is None:
                 return
+            self._talk_phase = TALK_THINK
             self.led.set(GOLD)
             reply = await asyncio.to_thread(self.api.voice_chat, wav, self.chat_session_id) if self.api.configured else None
             if reply is None:
@@ -319,4 +361,5 @@ class ChickenApp:
             logger.exception("会話でエラーが起きました")
         finally:
             self.led.set(OFF)
+            self._talk_phase = None
             self._busy_talking = False
