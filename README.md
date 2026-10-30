@@ -59,7 +59,7 @@
         ↕ BLE（たまご→鶏の一方向、Notifyのみ）
 [たまごユニット (ESP32 / PlatformIO / NimBLE-Arduino, BLE Peripheral)]
    ├─ 加速度センサー、PDMマイク（ADA-4346）
-   └─ 充電モジュールのSTATピンでドック検知（起床/就寝）
+   └─ 巣からの 5V を分圧して読み、ドック検知（起床/就寝。`docs/spec-changes.md` X-14）
         ↕ 物理接続（充電）
 [巣（充電ステーション）]
 ```
@@ -70,7 +70,7 @@
   - **Audio Level**：マイク音量レベル（uint16_t、0.2〜0.5秒ごとNotify）
   - **Motion Event**：加速度x/y/z（int16_t×3、イベント時＋数秒に1回Notify）
   - **Environment**：温湿度・照度 → **廃止予定**。環境センサーは鶏に載せると決定（Issue #4、`docs/spec-changes.md` X-01）
-  - **Dock Event**：起床/就寝検知（uint8_t、充電モジュールSTATピンのエッジ検知時のみNotify）
+  - **Dock Event**：起床/就寝検知（uint8_t。巣からの 5V の有無を読み、状態が確定して変わったときに Notify。Read でも読める）
 - データ形式：JSONではなくバイナリ構造体（struct）をそのままパックする方式
 
 ### 起床・二度寝防止の設計思想

@@ -29,7 +29,7 @@
 - 環境センサーは鶏に搭載すると決めた（Issue #4、`docs/spec-changes.md` X-01）。たまごはこの Characteristic を出さない。UUID（`d5c10a03-…`）は使い回さない
 
 ### Characteristic 4: Dock Event（起床/就寝検知）
-- 検知元：**巣からポゴピンを通って来る 5V**（2026-10-30 に、充電モジュールの STAT ピンから変更。`docs/spec-changes.md` X-13）。5V を抵抗2本（5V 側 10kΩ・GND 側 15kΩ）で分圧し、ESP32 の ADC（GPIO35、`PinConfig.h` の `DOCK_*`）で読む
+- 検知元：**巣からポゴピンを通って来る 5V**（2026-10-30 に、充電モジュールの STAT ピンから変更。`docs/spec-changes.md` X-14）。5V を抵抗2本（5V 側 10kΩ・GND 側 15kΩ）で分圧し、ESP32 の ADC（GPIO35、`PinConfig.h` の `DOCK_*`）で読む
 - 検知方式：巣の電圧が `DOCK_PRESENT_VOLTS`（既定 4.0V）以上なら「巣から給電されている」とみなす（実測：巣にあるとき 4.95V、出したとき 0.24V）。
   - 給電あり＝たまごが巣にある（巣に戻した＝起床）
   - 給電なし＝たまごが巣から離れた
