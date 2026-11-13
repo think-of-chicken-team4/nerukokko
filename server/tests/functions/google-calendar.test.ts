@@ -136,9 +136,10 @@ describe("予定を見る日", () => {
   it("24時間以内にアラームがあればアラームの日", () => {
     assert.equal(calendarTargetDate(NOW, new Date("2026-10-16T22:15:00Z")), "2026-10-17");
   });
-  it("アラームがない・遠いときは12時間後の日（19時なら翌日・深夜1時ならその日）", () => {
+  it("アラームがない・遠いときは、実行時刻にかかわらず翌日", () => {
     assert.equal(calendarTargetDate(NOW, null), "2026-10-17");
     assert.equal(calendarTargetDate(NOW, new Date("2026-10-19T22:00:00Z")), "2026-10-17");
-    assert.equal(calendarTargetDate(new Date("2026-10-16T16:00:00Z"), null), "2026-10-17");
+    assert.equal(calendarTargetDate(new Date("2026-10-16T02:59:00Z"), null), "2026-10-17");
+    assert.equal(calendarTargetDate(new Date("2026-10-16T16:00:00Z"), null), "2026-10-18");
   });
 });

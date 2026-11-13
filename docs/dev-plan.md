@@ -25,14 +25,14 @@
 - **たまごの充電検知**：STAT ピンをやめ、**巣の 5V を分圧して GPIO35 で読む**方式に変更（#56、spec-changes X-14）。満充電でも検知できる。マイクのピンは GPIO25・26（#52、A-30）。
 - **自動で本番に反映**（10/30）：main にマージすると、Webアプリは Vercel、DB・関数は GitHub Actions（「Supabase に公開」）が反映する。初回の実行は成功。
 - **鶏の声**：にわとり＝Puck、ひよこ＝Leda に決定（10/30、田村さんがサンプルを聞いて確認。日本語の発音も良い）。
-- **Googleカレンダーは未導入（11/13確認）**。コードは完成しているが、ローカルの`server/supabase/functions/.env`と本番Supabaseのどちらにも`GOOGLE_CLIENT_ID`・`GOOGLE_CLIENT_SECRET`・`GOOGLE_REDIRECT_URIS`がない。そのため設定画面は「準備中」になる。導入は`docs/cloud-setup.md` §3→§2→§6の順で行う。
+- **Googleカレンダーのローカル連携は成功（11/13）**。OAuthで予定の読み取りを許可し、トークンがDBに保存された。昼間に手動で就寝提案を作ると明日ではなく当日を参照していた不具合を修正し、アラーム未設定時は実行時刻にかかわらず明日の予定を見るよう、提案作成側とホーム表示側の日付判定を統一した。本番Supabaseへの3シークレット登録と公開版での再連携は未実施。
 - **公開版**：https://nerukokko.vercel.app （10/30。Supabase のクラウド＋Vercel。シミュレーターは使える設定。発表の前に `NEXT_PUBLIC_ENABLE_SIMULATOR` を `false` にする）。手順と、つまずいた点は `docs/cloud-setup.md`。
 - **開発仕様書（R08）**：文章は実装に合わせて Rev-1.1 に直した（10/23、田村さん）。図とフローチャートは未更新（下の TODO）。
 
 ### 次にやること
 
 **次回の作業の最初に、田村さんに知らせること（TODO）**
-- [ ] **Googleカレンダー連携を導入する**：Google CloudでCalendar APIとOAuthクライアントを準備し、ローカルで確認後、本番Supabaseへ3つのシークレットを登録する。具体的な順序は`docs/cloud-setup.md` §3→§2→§6。課金アカウントは作らない。
+- [ ] **Googleカレンダー連携を本番へ反映する**：Google Cloudでの準備とローカル確認は11/13に完了。本番Supabaseへ3つのシークレットを登録し、公開版で連携を確認する。具体的な手順は`docs/cloud-setup.md` §6。課金アカウントは作らない。
 - [ ] **発表前日にGoogleカレンダーを連携し直す**：Google OAuthを「テスト中」で使うため、連携が約7日で切れることがある。公開版`https://nerukokko.vercel.app`の「設定」で、一度解除して再連携するか、連携済み表示と翌日の予定取得を確認する（`docs/cloud-setup.md`「発表前日のチェック」）。
 - [ ] **開発仕様書（R08、Word）の図とフローチャートを作り直す**（来週、田村さん）。文章は Rev-1.1 に直し済み（10/23）。残りは画像の4つ：2.3 システム構成図（にわとりを Raspberry Pi 3 に、出力にディスプレイ、入力にタッチ）、p.8 立面図（トサカボタン → 目の位置のタッチディスプレイ）、フローチャート①（充電検知を「巣の 5V を検知」に。X-14）、フローチャート②（「ボタン押す」→「画面をタッチし、会話を選ぶ」、音声認識・合成を Gemini に）。直す内容はリポジトリ外の `資料/開発仕様書_修正一覧_20261023.md` の B〜E・I（I＝LED の廃止。2.4-2・4.2-3 は P-08 が決まるまで「（案）」）。
 - [ ] **19時の就寝提案の定期実行が本番で動いたか確かめる**（10/31 以降）：Supabase の SQL Editor で `select * from cron.job_run_details order by start_time desc limit 5;`。`evening-suggestion` が succeeded で、`net._http_response` が 200 なら OK。
