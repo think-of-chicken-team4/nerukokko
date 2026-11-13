@@ -333,8 +333,8 @@ const { data } = await supabase.functions.invoke("chat", {
 - ログインしたユーザーだけが呼べる（Authorization ヘッダー。`supabase.functions.invoke` なら自動で付く）。
 - `message` は1〜500文字（前後の空白は除く）。それ以外は 400 `invalid_message`。
 - `chat_session_id` が本人のアプリでの会話（`trigger = 'app'`）なら続きとして扱い、なければ新しい会話を作る（返ってきた id を次から送る）。
-- サーバーは、直近の睡眠データ・今夜の就寝提案・次のアラーム・この会話の直近10件を AI に渡して返答を作り、発言と返答を `chat_messages` に保存する。
-- AI が使えないとき（キーがない・混雑・障害）は、定型の返答と `fallback: true` を返す（200）。
+- サーバーは、直近の睡眠データ・今夜の就寝提案・次のアラーム・Googleカレンダーの明日の最初の時刻付き予定・この会話の直近10件を AI に渡して返答を作り、発言と返答を `chat_messages` に保存する。予定名は渡さず、開始時刻・設定した準備時間・おすすめ起床時刻だけを渡す。
+- AI が使えないとき（キーがない・混雑・障害）は、定型の返答と `fallback: true` を返す（200）。カレンダーや起床時刻の質問には、取得済みの予定時刻から具体的に回答する。
 - **1人1時間に30回まで**（Gemini の無料枠を使い切らないため）。超えたら AI を呼ばずに「少し休憩しよう」という定型の返答（`fallback: true`）。
 
 ### 4-4. `POST morning-summary` — 朝の振り返りの再計算
@@ -437,6 +437,7 @@ API を実装するために、次の変更を加える（`server/supabase/migra
 | `chat_sessions` | `trigger` に `'app'`（Webアプリのテキスト会話）を追加 | |
 | `google_credentials`（新規、T-205） | カレンダーのトークン。クライアントからは読めない（RPC `calendar_status()` で連携の有無だけ読める） | カレンダー連携（§4-7） |
 | `oauth_states`（新規、T-205） | OAuth の state（10分で無効、1回だけ使える）。クライアントからは読めない | 同意画面から戻ってきたのが本人の操作か確かめるため |
+| `notification_settings` | `calendar_prep_minutes`（15〜360分、初期値90分）を追加 | 予定より何分前に起きるかを利用者ごとに変えるため |
 
 ---
 

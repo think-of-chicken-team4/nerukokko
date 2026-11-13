@@ -4,11 +4,11 @@ import "@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "@supabase/server";
 
 import {
-  CHAT_FALLBACK,
   CHAT_HISTORY_LIMIT,
   CHAT_HOURLY_LIMIT,
   CHAT_LIMIT_REPLY,
   chatSystem,
+  contextualChatFallback,
   toHistory,
   validateMessage,
 } from "../_shared/chat.ts";
@@ -40,15 +40,16 @@ export default {
 
     // 1時間の上限（Gemini の無料枠を使い切らないため）。超えたら AI を呼ばずに休憩をすすめる
     const overLimit = (await userMessagesInLastHour(db, userId, now)) > CHAT_HOURLY_LIMIT;
+    const context = await loadContext(db, userId, now);
     const generated = overLimit
       ? null
       : await generateText({
-          system: chatSystem(await loadContext(db, userId, now)),
+          system: chatSystem(context),
           prompt: checked.message,
           history: toHistory(history),
           maxOutputTokens: 400,
         });
-    const reply = generated ? toOneParagraph(generated.text) : overLimit ? CHAT_LIMIT_REPLY : CHAT_FALLBACK;
+    const reply = generated ? toOneParagraph(generated.text) : overLimit ? CHAT_LIMIT_REPLY : contextualChatFallback(checked.message, context);
 
     const { error: replyError } = await db
       .from("chat_messages")

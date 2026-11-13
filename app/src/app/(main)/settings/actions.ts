@@ -62,6 +62,7 @@ export type NotificationSettings = {
   evening_suggestion: boolean;
   morning_score: boolean;
   character_voice: "rooster" | "chick";
+  calendar_prep_minutes: number;
 };
 
 const VOICES: readonly string[] = ["rooster", "chick"];
@@ -74,6 +75,12 @@ export async function updateNotificationSettings(patch: Partial<NotificationSett
   if (patch.character_voice !== undefined) {
     if (!VOICES.includes(patch.character_voice)) return { error: "ボイスを選び直してください" };
     values.character_voice = patch.character_voice;
+  }
+  if (patch.calendar_prep_minutes !== undefined) {
+    if (!Number.isInteger(patch.calendar_prep_minutes) || patch.calendar_prep_minutes < 15 || patch.calendar_prep_minutes > 360) {
+      return { error: "朝の準備時間は15〜360分で選んでください" };
+    }
+    values.calendar_prep_minutes = patch.calendar_prep_minutes;
   }
   if (Object.keys(values).length === 0) return {};
 
