@@ -15,6 +15,8 @@ const VOICES = [
   { value: "chick", label: "ひよこ（高め）" },
 ] as const;
 
+const PREP_MINUTES = [15, 30, 45, 60, 75, 90, 120, 150, 180, 240, 300, 360] as const;
+
 // 設定 →「🔔 通知」「🐔 キャラクターボイス」（T-103）。押すとすぐに表示を変え、裏で保存する
 export function NotificationSettingsCards({ settings }: { settings: NotificationSettings }) {
   const [current, applyOptimistic] = useOptimistic(settings, (state, patch: Partial<NotificationSettings>) => ({
@@ -71,6 +73,28 @@ export function NotificationSettingsCards({ settings }: { settings: Notification
             );
           })}
         </div>
+      </div>
+
+      <div className="card">
+        <h2 className="card-title">🌅 朝の準備時間</h2>
+        <p className="muted mb-1">カレンダーの最初の予定より、何分前に起きるかを設定します。</p>
+        <label className="row" htmlFor="calendar-prep-minutes">
+          <span className="row-label">予定までに必要な時間</span>
+          <select
+            id="calendar-prep-minutes"
+            className="input w-auto"
+            value={current.calendar_prep_minutes}
+            onChange={(event) => update({ calendar_prep_minutes: Number(event.target.value) })}
+          >
+            {PREP_MINUTES.map((minutes) => (
+              <option key={minutes} value={minutes}>
+                {minutes >= 60 ? `${Math.floor(minutes / 60)}時間${minutes % 60 ? `${minutes % 60}分` : ""}` : `${minutes}分`}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="hint mt-2">身支度・朝食・移動などを合計した時間の目安です。初期値は1時間30分です。</p>
+        {error && <p className="error-text">{error}</p>}
       </div>
     </>
   );

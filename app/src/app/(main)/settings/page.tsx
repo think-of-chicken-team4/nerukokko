@@ -19,7 +19,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     supabase.from("alarms").select("id, time, repeat_days, enabled").order("time"),
     supabase.rpc("next_alarm_at", { p_user_id: userId! }).maybeSingle(),
     supabase.from("sleep_sessions").select("planned_wake_time").eq("status", "in_progress").maybeSingle(),
-    supabase.from("notification_settings").select("evening_suggestion, morning_score, character_voice").maybeSingle(),
+    supabase
+      .from("notification_settings")
+      .select("evening_suggestion, morning_score, character_voice, calendar_prep_minutes")
+      .maybeSingle(),
     supabase.rpc("calendar_status").maybeSingle(),
   ]);
   if (alarmsResult.error) throw new Error(`アラームを読めませんでした: ${alarmsResult.error.message}`);

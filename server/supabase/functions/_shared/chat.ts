@@ -38,7 +38,19 @@ export type ChatContext = {
   tonight: { bedtime: string; reasoning: string | null } | null;
   /** 次に鳴るアラーム（日本時間の表示） */
   nextAlarm: string | null;
+  /** Googleカレンダーの明日の最初の予定。予定名はGeminiへ送らず、時刻だけを使う */
+  tomorrowEvent: { start: string; suggestedWake: string; prepMinutes: number } | null;
 };
+
+/** Geminiが使えない場合でも、カレンダー・起床時刻の質問には取得済みの事実から答える。 */
+export function contextualChatFallback(message: string, context: ChatContext): string {
+  const asksSchedule = /(カレンダー|予定|起き|起床)/.test(message);
+  if (asksSchedule && context.tomorrowEvent) {
+    const event = context.tomorrowEvent;
+    return `Googleカレンダーでは、明日の最初の予定は${event.start}からコケ。朝の準備時間を${event.prepMinutes}分として、${event.suggestedWake}に起きるのがおすすめコケ。`;
+  }
+  return CHAT_FALLBACK;
+}
 
 /** キャラクター設定に、この人の睡眠の情報を足す（会話の中で使ってよい事実として渡す） */
 export function chatSystem(context: ChatContext): string {
@@ -58,12 +70,19 @@ export function chatSystem(context: ChatContext): string {
   if (context.tonight) {
     facts.push(`今夜のおすすめの就寝時刻：${context.tonight.bedtime}${context.tonight.reasoning ? `（${context.tonight.reasoning}）` : ""}`);
   }
+  if (context.tomorrowEvent) {
+    facts.push(
+      `Googleカレンダーの明日の最初の予定：${context.tomorrowEvent.start}開始。朝の準備時間は${context.tomorrowEvent.prepMinutes}分で、おすすめの起床時刻は${context.tomorrowEvent.suggestedWake}`,
+    );
+  } else {
+    facts.push("Googleカレンダーから参照できる明日の時刻付き予定はない");
+  }
   facts.push(context.nextAlarm ? `次のアラーム：${context.nextAlarm}` : "アラームは未設定");
 
   return [
     CHICKEN_PERSONA,
     "これはアプリでの文字の会話です。睡眠や生活のことを中心に、相手の話にやさしく答えてください。",
-    "睡眠の記録について聞かれたら、次の情報だけを使って答えてください。",
+    "睡眠の記録や明日の予定について聞かれたら、次の情報だけを使って答えてください。予定名は渡していないので推測しないでください。",
     ...facts.map((f) => `- ${f}`),
   ].join("\n");
 }

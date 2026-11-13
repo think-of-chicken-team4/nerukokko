@@ -228,11 +228,11 @@ export async function fetchFirstEvent(
 }
 
 /**
- * 予定を見る日（日本時間）。24時間以内にアラームがあればアラームの日、なければ「12時間後の日」
- * （19時に作るなら翌日、深夜1時に作り直すならその日）。
+ * 予定を見る日（日本時間）。24時間以内にアラームがあればアラームの日、なければ翌日。
+ * 定期実行は19時だが、デモ用の手動実行を昼間に行っても、必ず「明日の予定」を参照する。
  */
 export function calendarTargetDate(now: Date, nextAlarm: Date | null): string {
   const ahead = nextAlarm ? nextAlarm.getTime() - now.getTime() : -1;
   const alarmSoon = ahead > 0 && ahead <= 24 * 60 * 60 * 1000;
-  return jstDateKey(alarmSoon ? nextAlarm! : new Date(now.getTime() + 12 * 60 * 60 * 1000));
+  return jstDateKey(alarmSoon ? nextAlarm! : new Date(now.getTime() + 24 * 60 * 60 * 1000));
 }

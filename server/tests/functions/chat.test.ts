@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { CHAT_MAX_LENGTH, chatSystem, toHistory, validateMessage } from "../../supabase/functions/_shared/chat.ts";
+import { CHAT_FALLBACK, CHAT_MAX_LENGTH, chatSystem, contextualChatFallback, toHistory, validateMessage } from "../../supabase/functions/_shared/chat.ts";
 import { generateText } from "../../supabase/functions/_shared/gemini.ts";
 import { formatJst, jstDateKey } from "../../supabase/functions/_shared/jst.ts";
 
@@ -33,25 +33,51 @@ describe("chatSystem", () => {
       displayName: "テスト",
       lastNight: { date: "10/16(金) 02:46", score: 96, label: "ぐっすり眠れました", turns: 20, snores: 6 },
       sleepingSince: null,
-      tonight: { bedtime: "10/16(金) 23:00", reasoning: "1限に間に合うコケ" },
+      tonight: { bedtime: "10/16(金) 23:00", reasoning: "明日の予定に間に合うコケ" },
       nextAlarm: "10/17(土) 07:15",
+      tomorrowEvent: { start: "10/17(土) 08:00", suggestedWake: "10/17(土) 06:30", prepMinutes: 90 },
     });
     assert.ok(system.includes("コケ"));
     assert.ok(system.includes("テストさん"));
     assert.ok(system.includes("スコア 96点"));
     assert.ok(system.includes("今夜のおすすめの就寝時刻：10/16(金) 23:00"));
     assert.ok(system.includes("次のアラーム：10/17(土) 07:15"));
+    assert.ok(system.includes("おすすめの起床時刻は10/17(土) 06:30"));
+    assert.ok(!system.includes("1限"));
   });
   it("記録がない・計測なし・アラームなしも、そのまま伝える", () => {
-    assert.ok(chatSystem({ displayName: "", lastNight: null, sleepingSince: null, tonight: null, nextAlarm: null }).includes("睡眠の記録はまだない"));
+    assert.ok(
+      chatSystem({ displayName: "", lastNight: null, sleepingSince: null, tonight: null, nextAlarm: null, tomorrowEvent: null }).includes(
+        "睡眠の記録はまだない",
+      ),
+    );
     const noData = chatSystem({
       displayName: "",
       lastNight: { date: "10/16", score: null, label: null, turns: 0, snores: 0 },
       sleepingSince: "10/16(金) 23:10",
       tonight: null,
       nextAlarm: null,
+      tomorrowEvent: null,
     });
     assert.ok(noData.includes("スコアなし") && noData.includes("記録中") && noData.includes("アラームは未設定"));
+  });
+});
+
+describe("contextualChatFallback", () => {
+  const context = {
+    displayName: "",
+    lastNight: null,
+    sleepingSince: null,
+    tonight: null,
+    nextAlarm: null,
+    tomorrowEvent: { start: "11/14(土) 06:00", suggestedWake: "11/14(土) 04:30", prepMinutes: 90 },
+  };
+  it("Geminiが使えなくてもカレンダーの起床質問には具体的に答える", () => {
+    const reply = contextualChatFallback("Googleカレンダーを見て、何時に起きればいい？", context);
+    assert.ok(reply.includes("06:00") && reply.includes("04:30") && reply.includes("90分"));
+  });
+  it("カレンダーと関係ない質問は共通の返答", () => {
+    assert.equal(contextualChatFallback("眠れない", context), CHAT_FALLBACK);
   });
 });
 
