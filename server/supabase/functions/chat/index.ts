@@ -40,8 +40,11 @@ export default {
 
     // 1時間の上限（Gemini の無料枠を使い切らないため）。超えたら AI を呼ばずに休憩をすすめる
     const overLimit = (await userMessagesInLastHour(db, userId, now)) > CHAT_HOURLY_LIMIT;
-    const context = await loadContext(db, userId, now);
-    const generated = overLimit
+    const context = await loadContext(db, userId, now, checked.message);
+    // カレンダーの質問は予定名をGeminiへ渡さず、取得した事実からサーバーが直接答える。
+    // Geminiの混雑時にも予定と起床時刻を確実に返せる。
+    const calendarReply = context.calendar ? contextualChatFallback(checked.message, context) : null;
+    const generated = overLimit || calendarReply
       ? null
       : await generateText({
           system: chatSystem(context),
@@ -49,7 +52,7 @@ export default {
           history: toHistory(history),
           maxOutputTokens: 400,
         });
-    const reply = generated ? toOneParagraph(generated.text) : overLimit ? CHAT_LIMIT_REPLY : contextualChatFallback(checked.message, context);
+    const reply = calendarReply ?? (generated ? toOneParagraph(generated.text) : overLimit ? CHAT_LIMIT_REPLY : contextualChatFallback(checked.message, context));
 
     const { error: replyError } = await db
       .from("chat_messages")
@@ -57,7 +60,7 @@ export default {
     if (replyError) throw new Error(replyError.message);
     await db.from("chat_sessions").update({ ended_at: new Date().toISOString() }).eq("id", chatSessionId);
 
-    return Response.json({ chat_session_id: chatSessionId, reply, fallback: generated === null });
+    return Response.json({ chat_session_id: chatSessionId, reply, fallback: !calendarReply && generated === null });
   }),
 };
 

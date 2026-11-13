@@ -8,6 +8,7 @@ import {
   calendarTargetDate,
   DEFAULT_REDIRECT_URIS,
   exchangeCode,
+  fetchCalendarEvents,
   fetchFirstEvent,
   GOOGLE_SCOPE,
   GoogleAuthError,
@@ -18,6 +19,7 @@ import {
   newState,
   pickFirstEvent,
   refreshAccessToken,
+  summarizeCalendarEvents,
 } from "../../supabase/functions/_shared/google-calendar.ts";
 
 const env = (values: Record<string, string>) => (name: string) => values[name];
@@ -110,6 +112,14 @@ describe("予定", () => {
   it("名前がない予定は「予定」", () => {
     assert.equal(pickFirstEvent([{ start: { dateTime: "2026-10-17T09:00:00+09:00" } }], after)!.title, "予定");
   });
+  it("チャット用の一覧には終日予定と予定名を含め、時刻順にする", () => {
+    const events = summarizeCalendarEvents([
+      { summary: "午後", start: { dateTime: "2026-10-17T13:00:00+09:00" } },
+      { summary: "試験", start: { date: "2026-10-17" } },
+      { summary: "朝", start: { dateTime: "2026-10-17T06:00:00+09:00" } },
+    ], after);
+    assert.deepEqual(events.map((event) => [event.title, event.allDay]), [["試験", true], ["朝", false], ["午後", false]]);
+  });
   it("日本時間の1日", () => {
     const { start, end } = jstDayRange("2026-10-17");
     assert.equal(start.toISOString(), "2026-10-16T15:00:00.000Z");
@@ -126,6 +136,12 @@ describe("予定", () => {
     assert.equal(url.searchParams.get("timeMin"), "2026-10-16T15:00:00.000Z");
     assert.equal(url.searchParams.get("singleEvents"), "true");
     assert.equal((calls[0].init?.headers as Record<string, string>).authorization, "Bearer at");
+  });
+  it("チャット用には終日予定も含めて読む", async () => {
+    const events = await fetchCalendarEvents("at", "2026-10-17", NOW, {
+      fetchImpl: fakeFetch(200, { items: [{ summary: "試験", start: { date: "2026-10-17" } }] }),
+    });
+    assert.deepEqual(events, [{ title: "試験", start: null, allDay: true }]);
   });
   it("トークンが使えなければ unauthorized", async () => {
     await assert.rejects(fetchFirstEvent("at", "2026-10-17", NOW, { fetchImpl: fakeFetch(401, {}) }), GoogleAuthError);

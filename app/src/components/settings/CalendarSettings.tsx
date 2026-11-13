@@ -35,7 +35,9 @@ export function CalendarSettings({ connected, connectedAt, message }: Props) {
             </div>
             <span className="pill pill-blue">連携中</span>
           </div>
-          <p className="muted mb-1">明日の最初の予定の90分前に起きられるよう、就寝時刻を提案します。予定の内容を書き換えることはありません。</p>
+          <p className="muted mb-1">
+            設定した朝の準備時間に合わせて就寝時刻を提案し、予定について尋ねたときはチャットでも予定名と時刻を使います。予定の内容を書き換えることはありません。
+          </p>
           <form action={disconnectCalendar}>
             <SubmitButton label="連携を解除する" pendingLabel="解除中…" variant="btn-secondary" />
           </form>
@@ -43,7 +45,7 @@ export function CalendarSettings({ connected, connectedAt, message }: Props) {
       ) : (
         <>
           <p className="muted mb-1">
-            Googleカレンダーの明日の予定を読み取り、間に合う時刻に起きられるよう就寝時刻を提案します（読み取りだけで、書き換えはしません）。
+            Googleカレンダーの予定を読み取り、就寝時刻の提案とカレンダーについてのチャット回答に使います（読み取りだけで、書き換えはしません）。
           </p>
           <form action={startCalendarLink}>
             <SubmitButton label="Googleカレンダーと連携する" pendingLabel="Google に移動中…" variant="btn-primary" />
