@@ -1,8 +1,7 @@
 // 会話（chat・voice-chat）で AI に渡す、その人の睡眠の情報と、回数の上限の数え方（DB を使う部品）。
 
-import type { ChatContext } from "./chat.ts";
-import { loadFirstEvent } from "./calendar-store.ts";
-import { calendarTargetDate } from "./google-calendar.ts";
+import { calendarQueryDate, calendarWakeTime, type ChatContext } from "./chat.ts";
+import { loadCalendarEvents } from "./calendar-store.ts";
 import type { Db } from "./http.ts";
 import { formatJst, jstDateKey } from "./jst.ts";
 import { scoreLabel } from "./score.ts";
@@ -22,7 +21,7 @@ export async function userMessagesInLastHour(db: Db, userId: string, now: Date):
 }
 
 /** AI に渡す、この人の睡眠の情報 */
-export async function loadContext(db: Db, userId: string, now: Date): Promise<ChatContext> {
+export async function loadContext(db: Db, userId: string, now: Date, message: string = ""): Promise<ChatContext> {
   const [profile, lastNight, active, alarm, recommendation, settings] = await Promise.all([
     db.from("users").select("display_name").eq("id", userId).maybeSingle(),
     db
@@ -37,7 +36,7 @@ export async function loadContext(db: Db, userId: string, now: Date): Promise<Ch
     db.rpc("next_alarm_at", { p_user_id: userId, p_from: now.toISOString() }).maybeSingle(),
     db
       .from("sleep_recommendations")
-      .select("recommended_bedtime, reasoning, first_event_start")
+      .select("recommended_bedtime, reasoning")
       .eq("user_id", userId)
       .gte("target_date", jstDateKey(now))
       .order("target_date")
@@ -48,12 +47,16 @@ export async function loadContext(db: Db, userId: string, now: Date): Promise<Ch
 
   const nextAlarm = alarm.data?.ring_at ? new Date(alarm.data.ring_at) : null;
   const prepMinutes = settings.data?.calendar_prep_minutes ?? 90;
-  const savedEventStart = recommendation.data?.first_event_start ? new Date(recommendation.data.first_event_start) : null;
-  // 直前に作った提案があれば同じ予定を使う。なければGoogleから直接読み、チャット単独でも予定を参照できるようにする。
-  const liveEvent = savedEventStart ? null : await loadFirstEvent(db, userId, calendarTargetDate(now, nextAlarm), now);
-  const eventStart = savedEventStart ?? liveEvent?.start ?? null;
-  const eventWake = eventStart ? new Date(eventStart.getTime() - prepMinutes * 60_000) : null;
-  const suggestedWake = eventWake && nextAlarm && nextAlarm.getTime() < eventWake.getTime() ? nextAlarm : eventWake;
+  const requestedDate = calendarQueryDate(message, now);
+  const calendarEvents = requestedDate ? await loadCalendarEvents(db, userId, requestedDate.dateKey, now) : null;
+  const firstTimedEvent = calendarEvents?.find((event) => event.start) ?? null;
+  // 「6時に起床」のような予定は、それ自体が起床時刻なので準備時間を前倒ししない。
+  const calendarWake = firstTimedEvent?.start ? calendarWakeTime(firstTimedEvent.title, firstTimedEvent.start, prepMinutes) : null;
+  const eventWake = calendarWake?.wake ?? null;
+  const alarmForRequestedDate = nextAlarm && requestedDate && jstDateKey(nextAlarm) === requestedDate.dateKey ? nextAlarm : null;
+  const suggestedWake = eventWake && alarmForRequestedDate && alarmForRequestedDate.getTime() < eventWake.getTime()
+    ? alarmForRequestedDate
+    : eventWake;
 
   let last: ChatContext["lastNight"] = null;
   if (lastNight.data) {
@@ -83,10 +86,20 @@ export async function loadContext(db: Db, userId: string, now: Date): Promise<Ch
       ? { bedtime: formatJst(recommendation.data.recommended_bedtime), reasoning: recommendation.data.reasoning }
       : null,
     nextAlarm: alarm.data?.ring_at ? formatJst(alarm.data.ring_at) : null,
-    tomorrowEvent: eventStart && suggestedWake
+    calendar: requestedDate && calendarEvents
       ? {
-          start: formatJst(eventStart),
-          suggestedWake: formatJst(suggestedWake),
+          dateLabel: requestedDate.label,
+          events: calendarEvents.slice(0, 10).map((event) =>
+            event.allDay ? `終日「${event.title.slice(0, 80)}」` : `${formatJst(event.start!)}「${event.title.slice(0, 80)}」`
+          ),
+          suggestedWake: suggestedWake ? formatJst(suggestedWake) : null,
+          wakeReason: suggestedWake
+            ? alarmForRequestedDate && suggestedWake === alarmForRequestedDate
+              ? "設定中のアラームを優先して"
+              : calendarWake?.isWakePlan
+              ? "最初の予定が起床予定なので"
+              : `朝の準備時間を${prepMinutes}分として`
+            : null,
           prepMinutes,
         }
       : null,

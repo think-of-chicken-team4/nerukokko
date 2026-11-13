@@ -179,6 +179,7 @@ export type CalendarEvent = {
 };
 
 export type FirstEvent = { title: string; start: Date };
+export type CalendarEventSummary = { title: string; start: Date | null; allDay: boolean };
 
 /** 日本時間のその日の 0:00〜24:00（UTC の時刻） */
 export function jstDayRange(dateKey: string): { start: Date; end: Date } {
@@ -202,16 +203,40 @@ export function pickFirstEvent(events: CalendarEvent[], after: Date): FirstEvent
   return candidates[0] ?? null;
 }
 
-/** その日（日本時間）の、now より後の最初の予定を読む */
-export async function fetchFirstEvent(
+/**
+ * チャットに渡すその日の予定一覧。終日予定も含めるが、起床時刻の計算に使うのは start がある予定だけ。
+ * 取り消し・不参加・すでに始まった時刻付き予定は除く。
+ */
+export function summarizeCalendarEvents(events: CalendarEvent[], after: Date): CalendarEventSummary[] {
+  const summaries: CalendarEventSummary[] = [];
+  for (const event of events) {
+    if (event.status === "cancelled") continue;
+    if (event.attendees?.some((attendee) => attendee.self && attendee.responseStatus === "declined")) continue;
+    const title = (event.summary ?? "").trim() || "予定";
+    if (event.start?.date) {
+      summaries.push({ title, start: null, allDay: true });
+      continue;
+    }
+    if (!event.start?.dateTime) continue;
+    const start = new Date(event.start.dateTime);
+    if (Number.isNaN(start.getTime()) || start.getTime() <= after.getTime()) continue;
+    summaries.push({ title, start, allDay: false });
+  }
+  return summaries.sort((a, b) => {
+    if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
+    return (a.start?.getTime() ?? 0) - (b.start?.getTime() ?? 0);
+  });
+}
+
+async function fetchEventItems(
   accessToken: string,
   dateKey: string,
   now: Date,
-  options: GoogleOptions = {},
-): Promise<FirstEvent | null> {
+  options: GoogleOptions,
+): Promise<CalendarEvent[]> {
   const { start, end } = jstDayRange(dateKey);
   const timeMin = start.getTime() > now.getTime() ? start : now;
-  if (timeMin.getTime() >= end.getTime()) return null;
+  if (timeMin.getTime() >= end.getTime()) return [];
   const params = new URLSearchParams({
     timeMin: timeMin.toISOString(),
     timeMax: end.toISOString(),
@@ -224,7 +249,27 @@ export async function fetchFirstEvent(
   if (res.status === 401) throw new GoogleAuthError("unauthorized", 401);
   if (!res.ok) throw new Error(`Google Calendar API error: ${res.status}`);
   const body = (await res.json()) as { items?: CalendarEvent[] };
-  return pickFirstEvent(body.items ?? [], now);
+  return body.items ?? [];
+}
+
+/** チャット用に、その日の予定を終日予定も含めて読む。 */
+export async function fetchCalendarEvents(
+  accessToken: string,
+  dateKey: string,
+  now: Date,
+  options: GoogleOptions = {},
+): Promise<CalendarEventSummary[]> {
+  return summarizeCalendarEvents(await fetchEventItems(accessToken, dateKey, now, options), now);
+}
+
+/** その日（日本時間）の、now より後の最初の予定を読む */
+export async function fetchFirstEvent(
+  accessToken: string,
+  dateKey: string,
+  now: Date,
+  options: GoogleOptions = {},
+): Promise<FirstEvent | null> {
+  return pickFirstEvent(await fetchEventItems(accessToken, dateKey, now, options), now);
 }
 
 /**
