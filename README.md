@@ -34,7 +34,7 @@
 
 | ユニット | 役割 |
 |---|---|
-| 🐔 にわとり本体 | LED光目覚まし、DSIディスプレイによる表情(目)表現、スピーカー・マイクによる音声会話、温湿度・照度・ミリ波レーダー計測、たまごとのBLE受信・クラウドとの通信を担う中枢 |
+| 🐔 にわとり本体 | DSIタッチディスプレイによる表情・操作・光、スピーカー・マイクによる音声会話、温湿度・照度・ミリ波レーダー計測、たまごとのBLE通信・クラウドとの通信を担う中枢 |
 | 🥚 たまごセンサー | 加速度センサーによる寝返り検出、マイクによるいびき・寝言検出、装着不要でベッドに置くだけ |
 | 🪺 巣（充電ステーション） | たまごの充電。充電開始検知＝アラーム停止（二度寝防止） |
 
@@ -50,13 +50,13 @@
 [バックエンド / DB (Supabase)]
    ├─ Edge Functions（センサー取込・AI会話・就寝提案・朝サマリー）
    ├─ PostgreSQL
-   └─ 外部API連携（Gemini / Google Calendar / Google STT・TTS）
+   └─ 外部API連携（Gemini / Google Calendar。音声認識・音声合成もGemini）
         ↕ Wi-Fi (HTTP REST)
 [鶏ユニット (Raspberry Pi 3 Model B / Python)]
    ├─ ミリ波レーダー（Acconeer A111、公式SDKで呼吸検知）
-   ├─ マイク（SPH0645LM4H, I2S）、LED、スピーカー、温湿度・照度センサー
+   ├─ マイク（SPH0645LM4H, I2S）、スピーカー、DSIタッチディスプレイ、温湿度・照度センサー
    └─ BLE Central（bleakでたまごからのNotify受信）
-        ↕ BLE（たまご→鶏の一方向、Notifyのみ）
+        ↕ BLE（計測値はたまご→鶏へNotify。Dock・Batteryは接続時と定期的にRead）
 [たまごユニット (ESP32 / PlatformIO / NimBLE-Arduino, BLE Peripheral)]
    ├─ 加速度センサー、PDMマイク（ADA-4346）
    └─ 巣からの 5V を分圧して読み、ドック検知（起床/就寝。`docs/spec-changes.md` X-14）
@@ -65,7 +65,7 @@
 ```
 
 ### BLE通信仕様（鶏⇔たまご）
-- 通信方向：たまご→鶏の一方向のみ（鶏からたまごへのWrite/コマンド送信はなし）
+- 通信方向：計測値はたまご→鶏へNotifyする。鶏からのWrite/コマンド送信はなく、Dock・Batteryの現在値は鶏がReadする。
 - GATT Characteristicは4種類（詳細は `docs/ble-protocol.md` を参照）：
   - **Audio Level**：マイク音量レベル（uint16_t、0.2〜0.5秒ごとNotify）
   - **Motion Event**：加速度x/y/z（int16_t×3、イベント時＋数秒に1回Notify）
@@ -94,7 +94,7 @@
 | 鶏⇔サーバー通信 | HTTP REST |
 | AI連携 | Gemini API（Edge Function経由） |
 | カレンダー連携 | Google Calendar API（Edge Function経由） |
-| 音声認識／音声合成 | Google Cloud Speech-to-Text ／ Text-to-Speech |
+| 音声認識／音声合成 | Gemini API（録音は保存せず、認識結果と返答文だけを保存） |
 
 ## ディレクトリ構成
 
@@ -102,7 +102,8 @@
 nerukokko/
 ├── README.md
 ├── CONTRIBUTING.md        # チーム開発ルール（ブランチ・コミット・PR）
-├── CLAUDE.md              # Claude Code 向けの開発ガイド
+├── AGENTS.md              # Codexを含むAI向けの共通ガイド
+├── CLAUDE.md              # 開発全体の詳細ルール（既存名を継続）
 ├── docs/                  # 仕様書・設計資料
 │   ├── full-spec.md       # 完全仕様書
 │   ├── software-spec.md   # ソフトウェア仕様書（DB設計・データフロー・フローチャート）
@@ -137,11 +138,11 @@ nerukokko/
 - `main` ブランチは保護されていて、直接 push できません。各自の個人ブランチ（例：`aryu`、`ren`）で作業し、Pull Request で `main` に入れます
 - 作業を始める前に `git pull` と `git merge origin/main` で最新にします
 - コミットメッセージは `<種類>(<範囲>): <日本語の要約>`（例：`feat(app): 設定画面にアラーム編集フォームを追加`）
-- PR は田村（PM）が Claude Code でレビューしてマージします。FW の PR には、実機で何を確認したかを書いてください
+- PR は田村（PM）がCodexなどのAIでレビューしてマージします。FWのPRには、実機で何を確認したかを書いてください
 - APIキー・パスワード・Wi-Fi情報は絶対にコミットしないでください（このリポジトリは公開されています）
 - タスク管理は [開発計画書](docs/dev-plan.md) と GitHub Issue で行います。ラベルは `frontend` `backend` `firmware` を使います
 - 開発スケジュールは創造設計デザインレビュー資料のガントチャートを参照してください（4月〜2月、30週間）
-- コードは AI（Claude Code など）に書かせてかまいません。AI には最初に [CLAUDE.md](CLAUDE.md) と [CONTRIBUTING.md](CONTRIBUTING.md) を読ませてください（Claude Code はリポジトリのフォルダで起動すれば自動で読み込みます）
+- コードは AI（Codex・Claude Code など）に書かせてかまいません。Codexは [AGENTS.md](AGENTS.md) を自動で読みます。ほかのAIにも [AGENTS.md](AGENTS.md)・[CLAUDE.md](CLAUDE.md)・[CONTRIBUTING.md](CONTRIBUTING.md) を読ませてください
 - 実機での検証・調整は AI にはできないので、ソフトウェア担当で分担します（[実機検証の一覧](docs/hw-verification.md)）
 
 ## メンバー
@@ -150,5 +151,5 @@ nerukokko/
 - サブリーダー：内海 圭吾
 - HW担当：松島 蓮、内海 圭吾、渡邉 健太
 - SW担当：田村 愛琉、岡田 蓮、浅井 蒼輝
-  - ソースコード（Webアプリ・バックエンド・鶏／たまご）：田村 愛琉（Claude Code を使用）
+  - ソースコード（Webアプリ・バックエンド・鶏／たまご）：田村 愛琉（CodexなどのAIを使用）
   - 実機での検証・調整：岡田 蓮（たまご中心）、浅井 蒼輝（鶏中心）
