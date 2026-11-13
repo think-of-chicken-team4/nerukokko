@@ -33,6 +33,7 @@
 
 **次回の作業の最初に、田村さんに知らせること（TODO）**
 - [ ] **Googleカレンダー連携を導入する**：Google CloudでCalendar APIとOAuthクライアントを準備し、ローカルで確認後、本番Supabaseへ3つのシークレットを登録する。具体的な順序は`docs/cloud-setup.md` §3→§2→§6。課金アカウントは作らない。
+- [ ] **発表前日にGoogleカレンダーを連携し直す**：Google OAuthを「テスト中」で使うため、連携が約7日で切れることがある。公開版`https://nerukokko.vercel.app`の「設定」で、一度解除して再連携するか、連携済み表示と翌日の予定取得を確認する（`docs/cloud-setup.md`「発表前日のチェック」）。
 - [ ] **開発仕様書（R08、Word）の図とフローチャートを作り直す**（来週、田村さん）。文章は Rev-1.1 に直し済み（10/23）。残りは画像の4つ：2.3 システム構成図（にわとりを Raspberry Pi 3 に、出力にディスプレイ、入力にタッチ）、p.8 立面図（トサカボタン → 目の位置のタッチディスプレイ）、フローチャート①（充電検知を「巣の 5V を検知」に。X-14）、フローチャート②（「ボタン押す」→「画面をタッチし、会話を選ぶ」、音声認識・合成を Gemini に）。直す内容はリポジトリ外の `資料/開発仕様書_修正一覧_20261023.md` の B〜E・I（I＝LED の廃止。2.4-2・4.2-3 は P-08 が決まるまで「（案）」）。
 - [ ] **19時の就寝提案の定期実行が本番で動いたか確かめる**（10/31 以降）：Supabase の SQL Editor で `select * from cron.job_run_details order by start_time desc limit 5;`。`evening-suggestion` が succeeded で、`net._http_response` が 200 なら OK。
 - [x] ~~Supabase のクラウドの設定（公開の準備）~~ → **10/30 に完了**。Supabase（Tokyo、Free）と Vercel（Hobby）で公開した：**https://nerukokko.vercel.app**。新規登録・チャット・デモ・朝のスコアまで動作確認済み。定期実行（10分ごとの記録の自動締め）も、関数を呼べている（200）ことを確認済み。19時の就寝提案のジョブは、翌日以降に `cron.job_run_details` で確かめる。残りは Google（§3・§6-1・§6-2）と鶏の接続先（§6-4）。
