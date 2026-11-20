@@ -10,6 +10,8 @@ from pathlib import Path
 from eyes.ipc import (
     COMMAND_ALARM_VOLUME_DOWN,
     COMMAND_ALARM_VOLUME_UP,
+    COMMAND_PREVIEW_ALARM,
+    COMMAND_PREVIEW_VOICE,
     COMMAND_STOP_RECORDING,
     COMMAND_TALK,
     COMMAND_VOLUME_DOWN,
@@ -23,10 +25,12 @@ from eyes.ipc import (
 )
 from eyes.menu import (
     ALARM_VOLUME_DOWN_BUTTON,
+    ALARM_PREVIEW_BUTTON,
     ALARM_VOLUME_UP_BUTTON,
     BACK_BUTTON,
     GEAR_BUTTON,
     TALK_ZONE,
+    VOICE_PREVIEW_BUTTON,
     VOLUME_DOWN_BUTTON,
     VOLUME_UP_BUTTON,
     MenuState,
@@ -172,13 +176,27 @@ class MenuTest(unittest.TestCase):
         self.assertEqual(m.tap(1.1, inside(ALARM_VOLUME_DOWN_BUTTON), NORMAL).command, COMMAND_ALARM_VOLUME_DOWN)
         self.assertEqual(m.tap(1.2, inside(VOLUME_UP_BUTTON), NORMAL).command, COMMAND_VOLUME_UP)  # 会話のほうとは、別のボタン
 
+    def test_preview_buttons_in_options(self) -> None:
+        m = MenuState(timeout_sec=20)
+        m.tap(0.0, inside(GEAR_BUTTON), NORMAL)
+        self.assertEqual(m.tap(1.0, inside(VOICE_PREVIEW_BUTTON), NORMAL).command, COMMAND_PREVIEW_VOICE)
+        self.assertEqual(m.tap(1.1, inside(ALARM_PREVIEW_BUTTON), NORMAL).command, COMMAND_PREVIEW_ALARM)
+        self.assertEqual(m.tap(1.2, inside(ALARM_PREVIEW_BUTTON), NORMAL).screen, Screen.OPTIONS)  # オプション画面のまま
+
+    def test_preview_buttons_do_nothing_while_alarm_ringing(self) -> None:
+        m = MenuState(timeout_sec=20)
+        self.assertIsNone(m.tap(0.0, inside(ALARM_PREVIEW_BUTTON), RINGING).command)
+
     def test_volume_buttons_do_not_change_volume_on_eyes_screen(self) -> None:
         m = MenuState(timeout_sec=20)
         # 目の画面では、音量のボタンはない（そこは、話しかける範囲なので、会話が始まるだけ）
         self.assertNotEqual(m.tap(0.0, inside(VOLUME_UP_BUTTON), NORMAL).command, COMMAND_VOLUME_UP)
 
     def test_option_rows_do_not_overlap(self) -> None:
-        rects = (VOLUME_DOWN_BUTTON, VOLUME_UP_BUTTON, ALARM_VOLUME_DOWN_BUTTON, ALARM_VOLUME_UP_BUTTON, BACK_BUTTON)
+        rects = (
+            VOLUME_DOWN_BUTTON, VOLUME_UP_BUTTON, VOICE_PREVIEW_BUTTON,
+            ALARM_VOLUME_DOWN_BUTTON, ALARM_VOLUME_UP_BUTTON, ALARM_PREVIEW_BUTTON, BACK_BUTTON,
+        )
         for i, a in enumerate(rects):
             for b in rects[i + 1:]:
                 overlap_x = a[0] < b[0] + b[2] and b[0] < a[0] + a[2]

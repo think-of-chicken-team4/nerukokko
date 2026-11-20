@@ -24,6 +24,8 @@ COMMAND_VOLUME_UP = "volume_up"  # 会話の音量を 1 段上げる
 COMMAND_VOLUME_DOWN = "volume_down"  # 会話の音量を 1 段下げる
 COMMAND_ALARM_VOLUME_UP = "alarm_volume_up"  # アラームの音量を 1 段上げる
 COMMAND_ALARM_VOLUME_DOWN = "alarm_volume_down"  # アラームの音量を 1 段下げる
+COMMAND_PREVIEW_VOICE = "preview_voice"  # 会話の声の見本を、いまの会話の音量で流す（音量の確認）
+COMMAND_PREVIEW_ALARM = "preview_alarm"  # アラームの音を、いまのアラームの音量で 1 回流す（音量の確認）
 
 
 def write_json_atomic(path: Path, data: dict) -> None:

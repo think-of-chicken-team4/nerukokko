@@ -4,7 +4,7 @@
         │                                  聞いている間は、画面のどこをタップしても話し終わり（操作 stop_recording）
         │ 左上の歯車をタップ
         ▼
-    [オプション画面]（会話とアラームの音量の「−」「＋」・「もどる」）── 何もしないで MENU_TIMEOUT_SEC たつ／「もどる」──> [目の画面]
+    [オプション画面]（会話とアラームの音量の「−」「＋」・確認の▶・「もどる」）── 何もしないで MENU_TIMEOUT_SEC たつ／「もどる」──> [目の画面]
 
 - 眠っている目（記録中）のときは、1 回目のタップは目を覚ますだけで、WAKE_TAP_WINDOW_SEC 以内の 2 回目のタップで会話を始める
   （寝ている間に手や物が当たって、会話が始まるのを防ぐ）。
@@ -21,6 +21,8 @@ from typing import Optional, Tuple
 from .ipc import (
     COMMAND_ALARM_VOLUME_DOWN,
     COMMAND_ALARM_VOLUME_UP,
+    COMMAND_PREVIEW_ALARM,
+    COMMAND_PREVIEW_VOICE,
     COMMAND_STOP_RECORDING,
     COMMAND_TALK,
     COMMAND_VOLUME_DOWN,
@@ -41,11 +43,13 @@ class Screen(Enum):
 SCREEN_SIZE = (800, 480)
 TALK_ZONE: Rect = (160, 96, 480, 288)  # 目の画面の中央あたり。ここをタップすると会話が始まる。端は反応させない（誤って触れたとき対策）
 GEAR_BUTTON: Rect = (30, 30, 100, 100)  # 左上の歯車。端から離す（画面の端のタッチは、誤って反応することがある）
-# オプション画面は 2 行：会話の音量、アラームの音量。各行は「ラベル  [−]  数字  [＋]」
-VOLUME_DOWN_BUTTON: Rect = (270, 50, 130, 100)  # 会話の音量（1 行目）
-VOLUME_UP_BUTTON: Rect = (590, 50, 130, 100)
-ALARM_VOLUME_DOWN_BUTTON: Rect = (270, 185, 130, 100)  # アラームの音量（2 行目）
-ALARM_VOLUME_UP_BUTTON: Rect = (590, 185, 130, 100)
+# オプション画面は 2 行：会話の音量、アラームの音量。各行は「ラベル  [−]  数字  [＋]  [▶ 確認]」
+VOLUME_DOWN_BUTTON: Rect = (250, 50, 100, 100)  # 会話の音量（1 行目）
+VOLUME_UP_BUTTON: Rect = (450, 50, 100, 100)
+VOICE_PREVIEW_BUTTON: Rect = (590, 50, 160, 100)  # 会話の声の見本を流す
+ALARM_VOLUME_DOWN_BUTTON: Rect = (250, 185, 100, 100)  # アラームの音量（2 行目）
+ALARM_VOLUME_UP_BUTTON: Rect = (450, 185, 100, 100)
+ALARM_PREVIEW_BUTTON: Rect = (590, 185, 160, 100)  # アラームの音を流す
 BACK_BUTTON: Rect = (300, 335, 200, 100)
 # 操作（話す・話し終わった）を送った直後は、次の操作を受け付けない。指が同じ場所をもう一度押した判定や、本体の状態が届くまでの二重押しを防ぐ
 TALK_LOCKOUT_SEC = 1.0
@@ -99,6 +103,10 @@ class MenuState:
             return MenuResult(self.screen, COMMAND_ALARM_VOLUME_DOWN)
         if contains(ALARM_VOLUME_UP_BUTTON, point):
             return MenuResult(self.screen, COMMAND_ALARM_VOLUME_UP)
+        if contains(VOICE_PREVIEW_BUTTON, point):
+            return MenuResult(self.screen, COMMAND_PREVIEW_VOICE)
+        if contains(ALARM_PREVIEW_BUTTON, point):
+            return MenuResult(self.screen, COMMAND_PREVIEW_ALARM)
         return MenuResult(self.screen)
 
     def _tap_eyes(self, now: float, point: Point, state: DisplayState) -> MenuResult:

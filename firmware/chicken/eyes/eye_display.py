@@ -30,10 +30,12 @@ from .eye_state import EXPRESSIONS, DarknessEstimator, EyeFrame, EyeState, Expre
 from .ipc import CommandSender, DisplayState, read_state
 from .menu import (
     ALARM_VOLUME_DOWN_BUTTON,
+    ALARM_PREVIEW_BUTTON,
     ALARM_VOLUME_UP_BUTTON,
     BACK_BUTTON,
     GEAR_BUTTON,
     SCREEN_SIZE as MENU_SCREEN_SIZE,
+    VOICE_PREVIEW_BUTTON,
     VOLUME_DOWN_BUTTON,
     VOLUME_UP_BUTTON,
     MenuState,
@@ -194,10 +196,15 @@ def draw_options(
     label_color = palette.pupil
     plus = "＋" if has_jp else "+"
     rows = (
-        ("voice", VOLUME_DOWN_BUTTON, VOLUME_UP_BUTTON, state.volume),
-        ("alarm", ALARM_VOLUME_DOWN_BUTTON, ALARM_VOLUME_UP_BUTTON, state.alarm_volume),
+        ("voice", VOLUME_DOWN_BUTTON, VOLUME_UP_BUTTON, VOICE_PREVIEW_BUTTON, state.volume),
+        ("alarm", ALARM_VOLUME_DOWN_BUTTON, ALARM_VOLUME_UP_BUTTON, ALARM_PREVIEW_BUTTON, state.alarm_volume),
     )
-    for key, down, up, value in rows:
+    for key, down, up, preview, value in rows:
+        box = pygame.Rect(preview)
+        pygame.draw.rect(surface, palette.eye, box, border_radius=40)
+        size = box.height // 3  # 再生の三角（フォントに記号がなくても出せるよう、自分で描く）
+        cx, cy = box.center
+        pygame.draw.polygon(surface, label_color, [(cx - size // 2, cy - size), (cx - size // 2, cy + size), (cx + size, cy)])
         for rect, text in ((down, "−"), (up, plus)):
             box = pygame.Rect(rect)
             pygame.draw.rect(surface, palette.eye, box, border_radius=40)

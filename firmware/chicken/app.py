@@ -31,6 +31,8 @@ from eyes import volume as volume_setting
 from eyes.ipc import (
     COMMAND_ALARM_VOLUME_DOWN,
     COMMAND_ALARM_VOLUME_UP,
+    COMMAND_PREVIEW_ALARM,
+    COMMAND_PREVIEW_VOICE,
     COMMAND_STOP_RECORDING,
     COMMAND_TALK,
     COMMAND_VOLUME_DOWN,
@@ -48,6 +50,7 @@ logger = logging.getLogger(__name__)
 
 RETRY_PHRASE = "ごめんコケ、うまく聞き取れなかったコケ。もう一回、画面にさわって話してほしいコケ。"
 OFFLINE_PHRASE = "いまインターネットにつながっていないコケ…。少しあとでまた話しかけてほしいコケ。"
+VOLUME_SAMPLE_PHRASE = "こんにちは、にわとりだコケ。この大きさで聞こえるコケ？"  # オプションの「会話の音量の確認」で流す見本
 
 
 def parse_time(value: Optional[str]) -> Optional[float]:
@@ -230,6 +233,7 @@ class ChickenApp:
         await asyncio.to_thread(self.phrases.ensure, config.ALARM_PHRASE, self.voice)
         await asyncio.to_thread(self.phrases.ensure, RETRY_PHRASE, self.voice)
         await asyncio.to_thread(self.phrases.ensure, OFFLINE_PHRASE, self.voice)
+        await asyncio.to_thread(self.phrases.ensure, VOLUME_SAMPLE_PHRASE, self.voice)
 
         for announcement in result.body.get("announcements") or []:
             text = announcement.get("text")
@@ -349,6 +353,10 @@ class ChickenApp:
                     self._change_volume(1 if command == COMMAND_VOLUME_UP else -1)
                 elif command in (COMMAND_ALARM_VOLUME_UP, COMMAND_ALARM_VOLUME_DOWN):
                     self._change_alarm_volume(1 if command == COMMAND_ALARM_VOLUME_UP else -1)
+                elif command == COMMAND_PREVIEW_VOICE:
+                    self._preview(VOLUME_SAMPLE_PHRASE, None, "会話の声")
+                elif command == COMMAND_PREVIEW_ALARM:
+                    self._preview(config.ALARM_PHRASE, self.alarm_volume, "アラーム")
                 elif command == COMMAND_STOP_RECORDING and self._talk_phase == TALK_LISTEN:
                     logger.info("「話し終わった」を受け取りました。録音を止めます")
                     self._record_stop.set()
@@ -381,6 +389,15 @@ class ChickenApp:
         logger.info("アラームの音量：%.1f", self.alarm_volume)
         if not self._busy_talking:
             asyncio.create_task(self.speaker.play(tone_wav(880, 0.4), volume=self.alarm_volume))
+
+    def _preview(self, phrase: str, volume: Optional[float], name: str) -> None:
+        """オプションの確認ボタン：声の見本かアラームの音を、いまの音量で 1 回流す（会話中・アラーム中は流さない）。
+        サーバーで作った声がまだないとき（オフライン・初回の同期前）は、合図の音で代える"""
+        if self.alarm.ringing or self._busy_talking:
+            return
+        logger.info("音量の確認：%s", name)
+        wav = self.phrases.get(phrase, self.voice) or tone_wav(880 if volume is not None else 660, 0.6)
+        asyncio.create_task(self.speaker.play(wav, volume=volume))
 
     def _on_talk_requested(self) -> None:
         if self.alarm.ringing:
