@@ -469,6 +469,7 @@ export type Database = {
       }
       notification_settings: {
         Row: {
+          calendar_prep_minutes: number
           character_voice: string
           evening_suggestion: boolean
           id: string
@@ -476,6 +477,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          calendar_prep_minutes?: number
           character_voice?: string
           evening_suggestion?: boolean
           id?: string
@@ -483,6 +485,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          calendar_prep_minutes?: number
           character_voice?: string
           evening_suggestion?: boolean
           id?: string

@@ -22,7 +22,7 @@ export type Recommendation = {
 
 /** そのユーザーの今夜の提案を作って保存する。アラームも明日の予定もなければ作らない（null） */
 export async function runEveningSuggestion(db: Db, userId: string, now: Date = new Date()): Promise<Recommendation | null> {
-  const [alarm, recent, profile] = await Promise.all([
+  const [alarm, recent, profile, settings] = await Promise.all([
     db.rpc("next_alarm_at", { p_user_id: userId, p_from: now.toISOString() }).maybeSingle(),
     db
       .from("sleep_sessions")
@@ -33,9 +33,11 @@ export async function runEveningSuggestion(db: Db, userId: string, now: Date = n
       .order("end_time", { ascending: false })
       .limit(RECENT_NIGHTS),
     db.from("users").select("display_name").eq("id", userId).maybeSingle(),
+    db.from("notification_settings").select("calendar_prep_minutes").eq("user_id", userId).maybeSingle(),
   ]);
   if (alarm.error) throw new Error(alarm.error.message);
   if (recent.error) throw new Error(recent.error.message);
+  if (settings.error) throw new Error(settings.error.message);
 
   const latencies = (recent.data ?? []).flatMap((s) => {
     const latency = (s.score_details as { efficiency?: { onset_latency_min?: number } | null } | null)?.efficiency
@@ -45,7 +47,7 @@ export async function runEveningSuggestion(db: Db, userId: string, now: Date = n
   const nextAlarm = alarm.data?.ring_at ? new Date(alarm.data.ring_at) : null;
   // カレンダー連携していれば、明日の最初の予定も見る（していなければ null）
   const firstEvent = await loadFirstEvent(db, userId, calendarTargetDate(now, nextAlarm), now);
-  const plan = planEvening(now, nextAlarm, latencies, firstEvent);
+  const plan = planEvening(now, nextAlarm, latencies, firstEvent, settings.data?.calendar_prep_minutes ?? 90);
   if (!plan) return null;
 
   const generated = await generateText({ ...eveningPrompt(plan, profile.data?.display_name ?? ""), maxOutputTokens: 200 });

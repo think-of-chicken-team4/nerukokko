@@ -1,7 +1,9 @@
 // Google カレンダーのトークンの読み書き（DB を使う部品）。トークンは google_credentials（サーバーだけが読める）。
 
 import {
+  fetchCalendarEvents,
   fetchFirstEvent,
+  type CalendarEventSummary,
   type FirstEvent,
   GoogleAuthError,
   type GoogleConfig,
@@ -43,6 +45,24 @@ async function accessToken(db: Db, config: GoogleConfig, userId: string, now: Da
       return null;
     }
     throw e;
+  }
+}
+
+/** チャット用に、その人の指定日の予定一覧（終日予定を含む）を読む。 */
+export async function loadCalendarEvents(
+  db: Db,
+  userId: string,
+  dateKey: string,
+  now: Date = new Date(),
+): Promise<CalendarEventSummary[] | null> {
+  const config = googleConfig();
+  if (!config) return null;
+  try {
+    const token = await accessToken(db, config, userId, now);
+    return token ? await fetchCalendarEvents(token, dateKey, now) : null;
+  } catch (error) {
+    console.error(`calendar (${userId}) failed`, error);
+    return null;
   }
 }
 

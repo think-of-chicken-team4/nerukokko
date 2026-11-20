@@ -9,7 +9,7 @@ import {
   expectedOnsetMinutes,
   MAX_ONSET_MIN,
   planEvening,
-  PREP_BEFORE_EVENT_MIN,
+  DEFAULT_PREP_BEFORE_EVENT_MIN,
 } from "../../supabase/functions/_shared/evening.ts";
 
 const NOW = new Date("2026-10-16T10:00:00Z"); // 19:00 JST
@@ -51,7 +51,7 @@ describe("planEvening（カレンダーの予定）", () => {
   const LATE = { title: "2限", start: new Date("2026-10-17T01:40:00Z") }; // 翌 10:40 JST → 09:10
   it("予定の90分前がアラームより早ければ、そちらで決める（アラームを早めるようすすめる）", () => {
     const plan = planEvening(NOW, ALARM, [], EARLY)!;
-    assert.equal(PREP_BEFORE_EVENT_MIN, 90);
+    assert.equal(DEFAULT_PREP_BEFORE_EVENT_MIN, 90);
     assert.equal(plan.wakeSource, "event");
     assert.equal(plan.wake.toISOString(), "2026-10-16T21:30:00.000Z");
     assert.equal(plan.bedtime.toISOString(), "2026-10-16T13:45:00.000Z"); // 06:30 − 7:45 = 22:45 JST
@@ -69,6 +69,12 @@ describe("planEvening（カレンダーの予定）", () => {
     assert.equal(plan.wakeSource, "event");
     assert.equal(plan.alarmTooLate, false);
     assert.equal(plan.targetDate, "2026-10-17");
+  });
+  it("ユーザーが設定した準備時間を使う", () => {
+    const plan = planEvening(NOW, null, [], EARLY, 45)!;
+    assert.equal(plan.prepBeforeEventMin, 45);
+    assert.equal(plan.wake.toISOString(), "2026-10-16T22:15:00.000Z");
+    assert.ok(eveningPrompt(plan, "テスト").prompt.includes("準備に45分見込む"));
   });
   it("90分前がもう過ぎている予定では決めない", () => {
     assert.equal(planEvening(NOW, null, [], { title: "すぐ", start: new Date("2026-10-16T11:00:00Z") }), null);

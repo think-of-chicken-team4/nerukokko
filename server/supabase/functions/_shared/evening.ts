@@ -13,7 +13,7 @@ export const DEFAULT_ONSET_MIN = 15;
 export const MIN_ONSET_MIN = 10;
 export const MAX_ONSET_MIN = 60;
 /** 明日の最初の予定の何分前に起きるか（身支度・朝ごはん・移動） */
-export const PREP_BEFORE_EVENT_MIN = 90;
+export const DEFAULT_PREP_BEFORE_EVENT_MIN = 90;
 /** この時間より先のアラームは「明日の朝」とみなさない */
 const LOOKAHEAD_MS = 24 * 60 * 60 * 1000;
 
@@ -30,6 +30,8 @@ export type EveningPlan = {
   alarm: Date | null;
   /** 明日の最初の予定（カレンダー連携しているとき） */
   event: FirstEvent | null;
+  /** 予定より何分前に起きるか（ユーザー設定） */
+  prepBeforeEventMin: number;
   /** 予定に間に合うには、アラームより早く起きる必要がある（アラームは自動では変えず、早めるようすすめる） */
   alarmTooLate: boolean;
 };
@@ -52,11 +54,12 @@ export function planEvening(
   nextAlarm: Date | null,
   onsetLatencies: number[],
   firstEvent: FirstEvent | null = null,
+  prepBeforeEventMin: number = DEFAULT_PREP_BEFORE_EVENT_MIN,
 ): EveningPlan | null {
   const alarm = nextAlarm && nextAlarm.getTime() > now.getTime() && nextAlarm.getTime() - now.getTime() <= LOOKAHEAD_MS
     ? nextAlarm
     : null;
-  const eventWake = firstEvent ? new Date(firstEvent.start.getTime() - PREP_BEFORE_EVENT_MIN * 60_000) : null;
+  const eventWake = firstEvent ? new Date(firstEvent.start.getTime() - prepBeforeEventMin * 60_000) : null;
   const event = eventWake && eventWake.getTime() > now.getTime() && eventWake.getTime() - now.getTime() <= LOOKAHEAD_MS
     ? firstEvent
     : null;
@@ -74,6 +77,7 @@ export function planEvening(
     onsetMin,
     alarm,
     event,
+    prepBeforeEventMin,
     alarmTooLate: useEvent && !!alarm,
   };
 }
@@ -98,7 +102,7 @@ export function eveningTemplate(plan: EveningPlan): string {
  */
 export function eveningPrompt(plan: EveningPlan, displayName: string): { system: string; prompt: string } {
   const facts = [
-    ...(plan.event ? [`明日の最初の予定の開始：${hm(plan.event.start)}（準備に${PREP_BEFORE_EVENT_MIN}分見込む）`] : []),
+    ...(plan.event ? [`明日の最初の予定の開始：${hm(plan.event.start)}（準備に${plan.prepBeforeEventMin}分見込む）`] : []),
     ...(plan.alarm ? [`明日のアラーム：${hm(plan.alarm)}`] : []),
     `明日の起床予定：${hm(plan.wake)}`,
     `眠りたい時間：7時間半（90分の睡眠のリズム5回ぶん）`,

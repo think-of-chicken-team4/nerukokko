@@ -138,6 +138,7 @@ export function SimulatorPanel({ userId, initialSession }: { userId: string; ini
   const [session, setSession] = useState<ActiveSession | null>(initialSession);
   const [logs, setLogs] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [makingSuggestion, setMakingSuggestion] = useState(false);
   const [auto, setAuto] = useState(false);
   // たまごが巣にあるか。本物の鶏は Dock Event で知り、device-sync で報告する（ホームの就寝準備・デバイス画面に出る）
   const [docked, setDocked] = useState(true);
@@ -303,7 +304,14 @@ export function SimulatorPanel({ userId, initialSession }: { userId: string; ini
         : "就寝提案：24時間以内のアラームも明日の予定もないので作りませんでした（設定でアラームを入れてください）",
     );
   };
-  const makeSuggestion = () => runTask(doSuggestion);
+  const makeSuggestion = async () => {
+    setMakingSuggestion(true);
+    try {
+      await runTask(doSuggestion);
+    } finally {
+      setMakingSuggestion(false);
+    }
+  };
 
   /**
    * 発表用デモ（T-305）：夕方の提案 → 就寝準備 → 眠る → 一晩を早回し → 起床 を、場面ごとに間をあけて自動で進める。
@@ -474,8 +482,21 @@ export function SimulatorPanel({ userId, initialSession }: { userId: string; ini
         <button type="button" className="btn btn-secondary btn-sm" disabled={disabled} onClick={sync}>
           状態を報告して次のアラームを受け取る（device-sync）
         </button>
-        <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={makeSuggestion}>
-          🌙 今夜の就寝提案を作る（evening-suggestion。ふだんは毎日19時）
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          disabled={busy}
+          aria-busy={makingSuggestion}
+          onClick={() => void makeSuggestion()}
+        >
+          {makingSuggestion ? (
+            <span className="inline-flex items-center gap-2">
+              <span className="inline-block size-4 animate-spin rounded-full border-2 border-current border-r-transparent" aria-hidden="true" />
+              カレンダーを確認して提案を作成中…
+            </span>
+          ) : (
+            "🌙 今夜の就寝提案を作る（evening-suggestion。ふだんは毎日19時）"
+          )}
         </button>
       </div>
 

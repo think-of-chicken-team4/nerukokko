@@ -1,6 +1,7 @@
 // 会話（chat・voice-chat）で AI に渡す、その人の睡眠の情報と、回数の上限の数え方（DB を使う部品）。
 
-import type { ChatContext } from "./chat.ts";
+import { calendarQueryDate, calendarWakeTime, type ChatContext } from "./chat.ts";
+import { loadCalendarEvents } from "./calendar-store.ts";
 import type { Db } from "./http.ts";
 import { formatJst, jstDateKey } from "./jst.ts";
 import { scoreLabel } from "./score.ts";
@@ -20,8 +21,8 @@ export async function userMessagesInLastHour(db: Db, userId: string, now: Date):
 }
 
 /** AI に渡す、この人の睡眠の情報 */
-export async function loadContext(db: Db, userId: string, now: Date): Promise<ChatContext> {
-  const [profile, lastNight, active, alarm, recommendation] = await Promise.all([
+export async function loadContext(db: Db, userId: string, now: Date, message: string = ""): Promise<ChatContext> {
+  const [profile, lastNight, active, alarm, recommendation, settings] = await Promise.all([
     db.from("users").select("display_name").eq("id", userId).maybeSingle(),
     db
       .from("sleep_sessions")
@@ -41,7 +42,21 @@ export async function loadContext(db: Db, userId: string, now: Date): Promise<Ch
       .order("target_date")
       .limit(1)
       .maybeSingle(),
+    db.from("notification_settings").select("calendar_prep_minutes").eq("user_id", userId).maybeSingle(),
   ]);
+
+  const nextAlarm = alarm.data?.ring_at ? new Date(alarm.data.ring_at) : null;
+  const prepMinutes = settings.data?.calendar_prep_minutes ?? 90;
+  const requestedDate = calendarQueryDate(message, now);
+  const calendarEvents = requestedDate ? await loadCalendarEvents(db, userId, requestedDate.dateKey, now) : null;
+  const firstTimedEvent = calendarEvents?.find((event) => event.start) ?? null;
+  // 「6時に起床」のような予定は、それ自体が起床時刻なので準備時間を前倒ししない。
+  const calendarWake = firstTimedEvent?.start ? calendarWakeTime(firstTimedEvent.title, firstTimedEvent.start, prepMinutes) : null;
+  const eventWake = calendarWake?.wake ?? null;
+  const alarmForRequestedDate = nextAlarm && requestedDate && jstDateKey(nextAlarm) === requestedDate.dateKey ? nextAlarm : null;
+  const suggestedWake = eventWake && alarmForRequestedDate && alarmForRequestedDate.getTime() < eventWake.getTime()
+    ? alarmForRequestedDate
+    : eventWake;
 
   let last: ChatContext["lastNight"] = null;
   if (lastNight.data) {
@@ -71,5 +86,22 @@ export async function loadContext(db: Db, userId: string, now: Date): Promise<Ch
       ? { bedtime: formatJst(recommendation.data.recommended_bedtime), reasoning: recommendation.data.reasoning }
       : null,
     nextAlarm: alarm.data?.ring_at ? formatJst(alarm.data.ring_at) : null,
+    calendar: requestedDate && calendarEvents
+      ? {
+          dateLabel: requestedDate.label,
+          events: calendarEvents.slice(0, 10).map((event) =>
+            event.allDay ? `終日「${event.title.slice(0, 80)}」` : `${formatJst(event.start!)}「${event.title.slice(0, 80)}」`
+          ),
+          suggestedWake: suggestedWake ? formatJst(suggestedWake) : null,
+          wakeReason: suggestedWake
+            ? alarmForRequestedDate && suggestedWake === alarmForRequestedDate
+              ? "設定中のアラームを優先して"
+              : calendarWake?.isWakePlan
+              ? "最初の予定が起床予定なので"
+              : `朝の準備時間を${prepMinutes}分として`
+            : null,
+          prepMinutes,
+        }
+      : null,
   };
 }
