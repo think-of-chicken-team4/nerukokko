@@ -32,13 +32,13 @@ class StepTest(unittest.TestCase):
 class AlarmMinimumTest(unittest.TestCase):
     def test_alarm_volume_cannot_go_below_minimum(self) -> None:
         m = volume.ALARM_VOLUME_MIN
-        self.assertEqual(m, 0.3)
-        v = 0.5
+        self.assertEqual(m, 0.5)
+        v = 0.8
         for _ in range(10):
             v = volume.step(v, -1, m)
-        self.assertEqual(v, 0.3)
-        self.assertEqual(volume.step(0.3, -1, m), 0.3)
-        self.assertEqual(volume.step(0.3, 1, m), 0.4)
+        self.assertEqual(v, 0.5)
+        self.assertEqual(volume.step(0.5, -1, m), 0.5)
+        self.assertEqual(volume.step(0.5, 1, m), 0.6)
 
     def test_conversation_volume_can_go_lower(self) -> None:
         self.assertEqual(volume.step(0.1, -1), 0.1)
@@ -48,14 +48,14 @@ class AlarmMinimumTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "alarm_volume.json"
             path.write_text('{"volume": 0.1}', encoding="utf-8")
-            self.assertEqual(volume.load(path, default=0.8, minimum=0.3), 0.3)
-            self.assertEqual(volume.load(path.with_name("none.json"), default=0.1, minimum=0.3), 0.3)
+            self.assertEqual(volume.load(path, default=0.8, minimum=0.5), 0.5)
+            self.assertEqual(volume.load(path.with_name("none.json"), default=0.1, minimum=0.5), 0.5)
 
     def test_save_clamps_to_alarm_minimum(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "alarm_volume.json"
-            volume.save(path, 0.1, minimum=0.3)
-            self.assertEqual(volume.load(path, default=0.8, minimum=0.3), 0.3)
+            volume.save(path, 0.1, minimum=0.5)
+            self.assertEqual(volume.load(path, default=0.8, minimum=0.5), 0.5)
 
 
 class SaveLoadTest(unittest.TestCase):

@@ -75,8 +75,53 @@ class Led:
 # ---------------------------------------------------------------- スピーカー（MAX98357A、C5）
 
 
+DB_PER_VOLUME_STEP = 2.5  # 音量を 0.1 変えるごとに、何 dB 変えるか（音量 1.0 が最大で、そのまま）。実機で調整する（C5）
+SOFT_KNEE = 0.6  # これ以下の大きさは、そのまま。これを超えた分だけ、ゆるやかに抑える（割れにくくする）
+
+
+def volume_to_gain(volume: float) -> float:
+    """画面の音量（0.1〜1.0）を、倍率にする。1 段（0.1）ごとに DB_PER_VOLUME_STEP dB ずつ、耳に自然な変わり方にする"""
+    v = max(0.0, min(volume, 1.0))
+    if v <= 0.0:
+        return 0.0
+    return 10.0 ** (-(1.0 - v) * 10.0 * DB_PER_VOLUME_STEP / 20.0)
+
+
+def boost_loudness(data: bytes, target_rms: float) -> bytes:
+    """16bit の WAV の平均の大きさ（RMS、0〜1）が target_rms より小さければ、そこまで大きくする。
+    ピークは、SOFT_KNEE を超えた分をゆるやかに抑えて、割れにくくする。target_rms が 0 なら何もしない。
+    声の合成音は、最大値が大きく平均が小さいので、そのままだと、小さなスピーカーで小さく聞こえる"""
+    if target_rms <= 0:
+        return data
+    try:
+        import numpy as np
+
+        with wave.open(io.BytesIO(data)) as src:
+            params = src.getparams()
+            frames = src.readframes(src.getnframes())
+        if params.sampwidth != 2 or not frames:
+            return data
+        x = np.frombuffer(frames, dtype="<i2").astype(np.float32) / 32768.0
+        rms = float(np.sqrt(np.mean(x * x)))
+        if rms <= 1e-6 or rms >= target_rms:
+            return data
+        y = x * (target_rms / rms)
+        mag = np.abs(y)
+        over = mag > SOFT_KNEE
+        room = 1.0 - SOFT_KNEE
+        y = np.where(over, np.sign(y) * (SOFT_KNEE + room * np.tanh((mag - SOFT_KNEE) / room)), y)
+        out = io.BytesIO()
+        with wave.open(out, "wb") as dst:
+            dst.setparams(params)
+            dst.writeframes((np.clip(y, -1.0, 1.0) * 32767.0).astype("<i2").tobytes())
+        return out.getvalue()
+    except Exception:
+        logger.exception("音の大きさをそろえられませんでした。そのまま流します")
+        return data
+
+
 def scale_wav(data: bytes, volume: float) -> bytes:
-    """16bit の WAV の音量を volume 倍にする（0〜1）"""
+    """16bit の WAV の大きさを volume 倍にする（0〜1。画面の音量ではなく、倍率。画面の音量は volume_to_gain で倍率にする）"""
     try:
         import numpy as np
 
@@ -124,7 +169,9 @@ class Speaker:
     async def play(self, wav: bytes, stop: Optional[asyncio.Event] = None, volume: Optional[float] = None) -> None:
         """volume を指定しなければ、いまの会話の音量（self.volume）で流す。アラームは ALARM_VOLUME を指定する"""
         async with self._lock:
-            await asyncio.to_thread(self._play_blocking, scale_wav(wav, self.volume if volume is None else volume), stop)
+            gain = volume_to_gain(self.volume if volume is None else volume)
+            loud = boost_loudness(wav, config.VOICE_TARGET_RMS)
+            await asyncio.to_thread(self._play_blocking, scale_wav(loud, gain), stop)
 
     def _play_blocking(self, wav: bytes, stop: Optional[asyncio.Event]) -> None:
         if not self._aplay:

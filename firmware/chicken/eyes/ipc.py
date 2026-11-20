@@ -62,7 +62,7 @@ class DisplayState:
     alarm_ringing: bool = False  # アラーム中。タッチでは止めない（二度寝防止）ので、メニューも開かない
     talk_phase: Optional[str] = None  # 会話の段階：listen（録音中）・think（返事待ち）・None（会話していない）
     volume: float = 0.8  # 会話の音量（0.1〜1.0）。オプション画面に表示する
-    alarm_volume: float = 0.8  # アラームの音量（0.3〜1.0）。オプション画面に表示する
+    alarm_volume: float = 0.8  # アラームの音量（0.5〜1.0）。オプション画面に表示する
 
 
 def write_state(path: Path, state: DisplayState, now: Optional[float] = None) -> None:
