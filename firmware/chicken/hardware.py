@@ -117,12 +117,14 @@ class Speaker:
     def __init__(self) -> None:
         self._aplay = shutil.which("aplay")
         self._lock = asyncio.Lock()
+        self.volume = config.SPEAKER_VOLUME  # 会話の返事・合図の音量。画面で変わる（app.py が保存した値で上書きする）
         if not self._aplay:
             logger.warning("aplay が見つかりません。音を流さずに続けます（ラズパイでは alsa-utils に入っている）")
 
-    async def play(self, wav: bytes, stop: Optional[asyncio.Event] = None) -> None:
+    async def play(self, wav: bytes, stop: Optional[asyncio.Event] = None, volume: Optional[float] = None) -> None:
+        """volume を指定しなければ、いまの会話の音量（self.volume）で流す。アラームは ALARM_VOLUME を指定する"""
         async with self._lock:
-            await asyncio.to_thread(self._play_blocking, scale_wav(wav, config.SPEAKER_VOLUME), stop)
+            await asyncio.to_thread(self._play_blocking, scale_wav(wav, self.volume if volume is None else volume), stop)
 
     def _play_blocking(self, wav: bytes, stop: Optional[asyncio.Event]) -> None:
         if not self._aplay:

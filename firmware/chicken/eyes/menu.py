@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, Tuple
 
-from .ipc import COMMAND_STOP_RECORDING, COMMAND_TALK, DisplayState
+from .ipc import COMMAND_STOP_RECORDING, COMMAND_TALK, COMMAND_VOLUME_DOWN, COMMAND_VOLUME_UP, DisplayState
 
 Point = Tuple[int, int]
 Rect = Tuple[int, int, int, int]  # x, y, 幅, 高さ
@@ -33,6 +33,8 @@ TALK_LOCKOUT_SEC = 1.0
 SCREEN_SIZE = (800, 480)
 TALK_BUTTON: Rect = (150, 110, 500, 150)
 BACK_BUTTON: Rect = (300, 310, 200, 100)
+VOLUME_DOWN_BUTTON: Rect = (150, 310, 120, 100)
+VOLUME_UP_BUTTON: Rect = (530, 310, 120, 100)
 
 
 def contains(rect: Rect, point: Point) -> bool:
@@ -65,6 +67,10 @@ class MenuState:
         if contains(BACK_BUTTON, point):
             self.screen = Screen.EYES
             return MenuResult(self.screen)
+        if contains(VOLUME_DOWN_BUTTON, point):
+            return MenuResult(self.screen, COMMAND_VOLUME_DOWN)  # 音量は、続けて押せるように、二重押しの防止は付けない
+        if contains(VOLUME_UP_BUTTON, point):
+            return MenuResult(self.screen, COMMAND_VOLUME_UP)
         if contains(TALK_BUTTON, point):
             if now < self._talk_locked_until:
                 return MenuResult(self.screen)  # 操作を送った直後の、二重のタッチは無視する

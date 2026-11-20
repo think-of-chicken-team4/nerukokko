@@ -27,7 +27,15 @@ import integration_config as config
 
 from .eye_state import EXPRESSIONS, DarknessEstimator, EyeFrame, EyeState, Expression
 from .ipc import CommandSender, DisplayState, read_state
-from .menu import BACK_BUTTON, SCREEN_SIZE as MENU_SCREEN_SIZE, TALK_BUTTON, MenuState, Screen
+from .menu import (
+    BACK_BUTTON,
+    SCREEN_SIZE as MENU_SCREEN_SIZE,
+    TALK_BUTTON,
+    VOLUME_DOWN_BUTTON,
+    VOLUME_UP_BUTTON,
+    MenuState,
+    Screen,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -146,6 +154,7 @@ MENU_TEXT = {
     "stop": ("話し終わった", "DONE"),  # 録音中は「話す」が、これに変わる
     "think": ("考え中…", "..."),
     "back": ("もどる", "BACK"),
+    "volume": ("音量", "VOL"),
 }
 
 
@@ -169,6 +178,14 @@ def draw_menu(surface: pygame.Surface, state: DisplayState, darkness: float, fon
         pygame.draw.rect(surface, fill, box, border_radius=40)
         label = font.render(text, True, label_color)
         surface.blit(label, label.get_rect(center=box.center))
+    for rect, text in ((VOLUME_DOWN_BUTTON, "−"), (VOLUME_UP_BUTTON, "＋" if has_jp else "+")):
+        box = pygame.Rect(rect)
+        pygame.draw.rect(surface, palette.eye, box, border_radius=40)
+        label = fonts[0].render(text, True, label_color)
+        surface.blit(label, label.get_rect(center=box.center))
+    volume_text = f"{MENU_TEXT['volume'][0 if has_jp else 1]} {round(state.volume * 10)}"
+    label = fonts[1].render(volume_text, True, label_color)
+    surface.blit(label, label.get_rect(center=(MENU_SCREEN_SIZE[0] // 2, 55)))  # いまの音量（1〜10）
 
 
 def run(windowed: bool, expression: Expression, darkness: float | None, link: bool = False) -> None:

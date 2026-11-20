@@ -93,7 +93,9 @@ MIC_MAX_SEC = _float("MIC_MAX_SEC", 12)  # 録音の最長（サーバーは約1
 
 # ===== スピーカー（MAX98357A。実機で調整：C5）=====
 AUDIO_OUTPUT_DEVICE = _str("AUDIO_OUTPUT_DEVICE") or None  # aplay -D に渡す名前（例：plughw:CARD=sndrpihifiberry）。空なら既定
-SPEAKER_VOLUME = _float("SPEAKER_VOLUME", 0.8)  # 0〜1
+SPEAKER_VOLUME = _float("SPEAKER_VOLUME", 0.8)  # 会話の返事・合図の音量の初期値（0〜1）。画面の「−」「＋」で変えると、その値を保存して、次の起動でも使う
+ALARM_VOLUME = _float("ALARM_VOLUME", 0.8)  # アラームの音量（0〜1）。夜に会話の音量を下げても、アラームが小さくならないよう、画面では変えない（実機で決める：C5）
+VOLUME_PATH = DATA_DIR / "volume.json"  # 画面で決めた会話の音量の保存先
 
 # ===== LED（WS2812B。実機で調整：C6）=====
 LED_PIN = _int("LED_PIN", 12)  # GPIO 番号（GPIO18 は I2S と重なるので使わない）

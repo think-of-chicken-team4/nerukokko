@@ -27,7 +27,16 @@ from api_client import ApiClient, Outcome
 from detectors import BreathingAggregator, SoundConfig, SoundDetector, TurnConfig, TurnDetector
 from egg_link import EggLink
 from environment_sensor import EnvironmentReading, EnvironmentSensor
-from eyes.ipc import COMMAND_STOP_RECORDING, COMMAND_TALK, CommandReceiver, DisplayState, write_state
+from eyes import volume as volume_setting
+from eyes.ipc import (
+    COMMAND_STOP_RECORDING,
+    COMMAND_TALK,
+    COMMAND_VOLUME_DOWN,
+    COMMAND_VOLUME_UP,
+    CommandReceiver,
+    DisplayState,
+    write_state,
+)
 from eyes.mood import TALK_LISTEN, TALK_THINK, choose_expression
 from hardware import GOLD, LISTENING, OFF, Led, Recorder, Speaker, tone_wav
 from outbox import Outbox, iso
@@ -91,6 +100,7 @@ class ChickenApp:
         self.radar = self._start_radar()
         self.led = Led()
         self.speaker = Speaker()
+        self.speaker.volume = volume_setting.load(config.VOLUME_PATH, config.SPEAKER_VOLUME)  # 画面で決めた音量（なければ SPEAKER_VOLUME）
         self.recorder = Recorder()
 
         self.voice = "rooster"
@@ -289,7 +299,7 @@ class ChickenApp:
     async def _ring_sound(self, stop: asyncio.Event) -> None:
         wav = self.phrases.get(config.ALARM_PHRASE, self.voice) or tone_wav(880, 0.6)
         while not stop.is_set():
-            await self.speaker.play(wav, stop)
+            await self.speaker.play(wav, stop, volume=config.ALARM_VOLUME)  # アラームは、会話の音量と別（画面では変えない）
             try:
                 await asyncio.wait_for(stop.wait(), timeout=2.0)
             except asyncio.TimeoutError:
@@ -315,7 +325,8 @@ class ChickenApp:
             morning_hour=config.MORNING_AWAKE_HOUR,
         )
         return DisplayState(
-            expression=expression, busy=self._busy_talking, alarm_ringing=ringing, talk_phase=self._talk_phase
+            expression=expression, busy=self._busy_talking, alarm_ringing=ringing, talk_phase=self._talk_phase,
+            volume=self.speaker.volume,
         )
 
     async def _display_loop(self) -> None:
@@ -329,12 +340,27 @@ class ChickenApp:
                     logger.info("画面から操作を受け取りました：%s", command)
                 if command == COMMAND_TALK:
                     self._on_talk_requested()
+                elif command in (COMMAND_VOLUME_UP, COMMAND_VOLUME_DOWN):
+                    self._change_volume(1 if command == COMMAND_VOLUME_UP else -1)
                 elif command == COMMAND_STOP_RECORDING and self._talk_phase == TALK_LISTEN:
                     logger.info("「話し終わった」を受け取りました。録音を止めます")
                     self._record_stop.set()
             except Exception:
                 logger.exception("画面との連携でエラーが起きました")
             await asyncio.sleep(config.DISPLAY_POLL_SEC)
+
+    def _change_volume(self, direction: int) -> None:
+        """画面の「−」「＋」：会話の音量を 1 段変えて保存し、新しい音量で短い音を鳴らして大きさを知らせる"""
+        if self.alarm.ringing:
+            return
+        self.speaker.volume = volume_setting.step(self.speaker.volume, direction)
+        try:
+            volume_setting.save(config.VOLUME_PATH, self.speaker.volume)
+        except OSError:
+            logger.warning("音量を保存できませんでした")
+        logger.info("会話の音量：%.1f", self.speaker.volume)
+        if not self._busy_talking:
+            asyncio.create_task(self.speaker.play(tone_wav(660, 0.25)))
 
     def _on_talk_requested(self) -> None:
         if self.alarm.ringing:

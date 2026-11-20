@@ -10,6 +10,8 @@ from pathlib import Path
 from eyes.ipc import (
     COMMAND_STOP_RECORDING,
     COMMAND_TALK,
+    COMMAND_VOLUME_DOWN,
+    COMMAND_VOLUME_UP,
     CommandReceiver,
     CommandSender,
     DisplayState,
@@ -17,7 +19,7 @@ from eyes.ipc import (
     write_json_atomic,
     write_state,
 )
-from eyes.menu import BACK_BUTTON, TALK_BUTTON, MenuState, Screen
+from eyes.menu import BACK_BUTTON, TALK_BUTTON, VOLUME_DOWN_BUTTON, VOLUME_UP_BUTTON, MenuState, Screen
 
 NORMAL = DisplayState()
 BUSY = DisplayState(busy=True)
@@ -142,6 +144,24 @@ class MenuTest(unittest.TestCase):
         m.tap(0.0, (400, 240), NORMAL)
         m.tap(1.0, center(TALK_BUTTON), NORMAL)
         self.assertEqual(m.tap(1.1, center(BACK_BUTTON), LISTENING).screen, Screen.EYES)
+
+    def test_volume_buttons_send_commands_and_repeat(self) -> None:
+        m = MenuState(timeout_sec=20)
+        m.tap(0.0, (400, 240), NORMAL)
+        self.assertEqual(m.tap(1.0, center(VOLUME_UP_BUTTON), NORMAL).command, COMMAND_VOLUME_UP)
+        self.assertEqual(m.tap(1.1, center(VOLUME_UP_BUTTON), NORMAL).command, COMMAND_VOLUME_UP)  # 続けて押せる
+        self.assertEqual(m.tap(1.2, center(VOLUME_DOWN_BUTTON), BUSY).command, COMMAND_VOLUME_DOWN)  # 会話中も変えられる
+        self.assertEqual(m.tap(1.3, center(VOLUME_DOWN_BUTTON), NORMAL).screen, Screen.MENU)
+
+    def test_volume_buttons_ignored_while_alarm_ringing(self) -> None:
+        m = MenuState(timeout_sec=20)
+        self.assertIsNone(m.tap(0.0, center(VOLUME_UP_BUTTON), RINGING).command)
+
+    def test_volume_in_state_roundtrip(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "display.json"
+            write_state(path, DisplayState(volume=0.6), now=1000.0)
+            self.assertEqual(read_state(path, now=1001.0, stale_sec=10).volume, 0.6)
 
     def test_talk_phase_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as d:
