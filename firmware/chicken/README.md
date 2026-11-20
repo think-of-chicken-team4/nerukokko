@@ -58,7 +58,7 @@
 | C2 レーダー | `RADAR_PRESENCE_ENV_MAX`・`RADAR_BREATHING_STD_MM`・`RADAR_PRESENCE_HOLD_SEC` | 100・0.5・60 | ベッドの置き場所で「人なし・呼吸・息止め」を測って決める（#16） |
 | C3 温湿度 | `ENV_TEMP_OFFSET_C`・`ENV_HUMIDITY_OFFSET_PCT` | 0・0 | 市販の温湿度計との差 |
 | C4 マイク | `MIC_DEVICE`・`MIC_GAIN`・`MIC_VOICE_LEVEL`・`MIC_AUTO_STOP`・`MIC_SILENCE_SEC` | 既定・1.0・500・1.5 | 会話を始めて話し、話し終わりで録音が止まる値 |
-| C5 スピーカー | `AUDIO_OUTPUT_DEVICE`・`SPEAKER_VOLUME`・`ALARM_VOLUME` | 既定・0.8・0.8 | 枕元でちょうどよく聞こえる音量。`SPEAKER_VOLUME`（会話）は画面の「−」「＋」で変えられ、変えた値が保存される。`ALARM_VOLUME`（アラーム）は画面では変えない |
+| C5 スピーカー | `AUDIO_OUTPUT_DEVICE`・`SPEAKER_VOLUME`・`ALARM_VOLUME` | 既定・0.8・0.8 | 枕元でちょうどよく聞こえる音量。`SPEAKER_VOLUME`（会話）と `ALARM_VOLUME`（アラーム）は、どちらも画面のオプション（左上の歯車）の「−」「＋」で別々に変えられ、変えた値が保存される。アラームの下限は 0.3 |
 | C6 LED | `LED_PIN`・`LED_COUNT`・`LED_BRIGHTNESS` | 12・2・180 | 配線と、まぶしすぎない明るさ |
 | D1〜D3 ディスプレイ | `DISPLAY_FPS`・`DISPLAY_POLL_SEC`・`DISPLAY_STALE_SEC`・`MENU_TIMEOUT_SEC`・`EVENING_SLEEPY_HOUR`・`MORNING_AWAKE_HOUR` | 30・0.3・5・20・21・6 | CPU の使用率（D1）を見て `DISPLAY_FPS` を決める。メニューのボタンの大きさ・位置（`eyes/menu.py`）は指で押しやすいか確かめる。`docs/dsi-display-spec.md` §5 |
 | — アラーム | `ALARM_MAX_RING_SEC`・`ALARM_SUNRISE_SEC` | 1800・60 | 好みで |

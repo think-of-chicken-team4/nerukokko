@@ -29,6 +29,8 @@ from egg_link import EggLink
 from environment_sensor import EnvironmentReading, EnvironmentSensor
 from eyes import volume as volume_setting
 from eyes.ipc import (
+    COMMAND_ALARM_VOLUME_DOWN,
+    COMMAND_ALARM_VOLUME_UP,
     COMMAND_STOP_RECORDING,
     COMMAND_TALK,
     COMMAND_VOLUME_DOWN,
@@ -37,7 +39,7 @@ from eyes.ipc import (
     DisplayState,
     write_state,
 )
-from eyes.mood import TALK_LISTEN, TALK_THINK, choose_expression
+from eyes.mood import TALK_LISTEN, TALK_SPEAK, TALK_THINK, choose_expression
 from hardware import GOLD, LISTENING, OFF, Led, Recorder, Speaker, tone_wav
 from outbox import Outbox, iso
 from uplink import Uplink
@@ -101,6 +103,9 @@ class ChickenApp:
         self.led = Led()
         self.speaker = Speaker()
         self.speaker.volume = volume_setting.load(config.VOLUME_PATH, config.SPEAKER_VOLUME)  # 画面で決めた音量（なければ SPEAKER_VOLUME）
+        self.alarm_volume = volume_setting.load(
+            config.ALARM_VOLUME_PATH, config.ALARM_VOLUME, volume_setting.ALARM_VOLUME_MIN
+        )  # 画面で決めたアラームの音量（なければ ALARM_VOLUME）
         self.recorder = Recorder()
 
         self.voice = "rooster"
@@ -299,7 +304,7 @@ class ChickenApp:
     async def _ring_sound(self, stop: asyncio.Event) -> None:
         wav = self.phrases.get(config.ALARM_PHRASE, self.voice) or tone_wav(880, 0.6)
         while not stop.is_set():
-            await self.speaker.play(wav, stop, volume=config.ALARM_VOLUME)  # アラームは、会話の音量と別（画面では変えない）
+            await self.speaker.play(wav, stop, volume=self.alarm_volume)  # アラームは、会話の音量と別
             try:
                 await asyncio.wait_for(stop.wait(), timeout=2.0)
             except asyncio.TimeoutError:
@@ -326,7 +331,7 @@ class ChickenApp:
         )
         return DisplayState(
             expression=expression, busy=self._busy_talking, alarm_ringing=ringing, talk_phase=self._talk_phase,
-            volume=self.speaker.volume,
+            volume=self.speaker.volume, alarm_volume=self.alarm_volume,
         )
 
     async def _display_loop(self) -> None:
@@ -342,6 +347,8 @@ class ChickenApp:
                     self._on_talk_requested()
                 elif command in (COMMAND_VOLUME_UP, COMMAND_VOLUME_DOWN):
                     self._change_volume(1 if command == COMMAND_VOLUME_UP else -1)
+                elif command in (COMMAND_ALARM_VOLUME_UP, COMMAND_ALARM_VOLUME_DOWN):
+                    self._change_alarm_volume(1 if command == COMMAND_ALARM_VOLUME_UP else -1)
                 elif command == COMMAND_STOP_RECORDING and self._talk_phase == TALK_LISTEN:
                     logger.info("「話し終わった」を受け取りました。録音を止めます")
                     self._record_stop.set()
@@ -361,6 +368,19 @@ class ChickenApp:
         logger.info("会話の音量：%.1f", self.speaker.volume)
         if not self._busy_talking:
             asyncio.create_task(self.speaker.play(tone_wav(660, 0.25)))
+
+    def _change_alarm_volume(self, direction: int) -> None:
+        """画面のオプション：アラームの音量を 1 段変えて保存し、新しい音量でアラームに近い音を短く鳴らして大きさを知らせる"""
+        if self.alarm.ringing:
+            return
+        self.alarm_volume = volume_setting.step(self.alarm_volume, direction, volume_setting.ALARM_VOLUME_MIN)
+        try:
+            volume_setting.save(config.ALARM_VOLUME_PATH, self.alarm_volume, volume_setting.ALARM_VOLUME_MIN)
+        except OSError:
+            logger.warning("アラームの音量を保存できませんでした")
+        logger.info("アラームの音量：%.1f", self.alarm_volume)
+        if not self._busy_talking:
+            asyncio.create_task(self.speaker.play(tone_wav(880, 0.4), volume=self.alarm_volume))
 
     def _on_talk_requested(self) -> None:
         if self.alarm.ringing:
@@ -385,11 +405,13 @@ class ChickenApp:
             self.led.set(GOLD)
             reply = await asyncio.to_thread(self.api.voice_chat, wav, self.chat_session_id) if self.api.configured else None
             if reply is None:
+                self._talk_phase = TALK_SPEAK
                 await self.speaker.play(self.phrases.get(OFFLINE_PHRASE, self.voice) or tone_wav(440, 0.5))
                 return
             self.chat_session_id = reply.get("chat_session_id")
             logger.info("あなた：%s／にわとり：%s", reply.get("user_text"), reply.get("reply_text"))
             audio = reply.get("audio") or self.phrases.get(RETRY_PHRASE, self.voice) or tone_wav()
+            self._talk_phase = TALK_SPEAK
             await self.speaker.play(audio)
         except Exception:
             logger.exception("会話でエラーが起きました")

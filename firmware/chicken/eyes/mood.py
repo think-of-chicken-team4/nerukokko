@@ -1,6 +1,6 @@
 """鶏の状態から、目の表情を選ぶ（描画に依存しない）。docs/dsi-display-spec.md §3。
 
-優先順位：アラーム > 会話（聞いている・考え中） > 朝のコメント（うれしい） > 記録中（眠り） > 夜（眠い） > 通常
+優先順位：アラーム > 会話（聞いている・考え中・話している） > 朝のコメント（うれしい） > 記録中（眠り） > 夜（眠い） > 通常
 """
 
 from __future__ import annotations
@@ -9,6 +9,7 @@ from typing import Optional
 
 TALK_LISTEN = "listen"  # 録音中
 TALK_THINK = "think"  # 送信〜返事を待っている
+TALK_SPEAK = "speak"  # 返事を話している（再生中）
 
 KIND_MORNING_SUMMARY = "morning_summary"  # announcements の kind（api-spec §6）
 
@@ -31,6 +32,8 @@ def choose_expression(
         return "listen"
     if talk_phase == TALK_THINK:
         return "think"
+    if talk_phase == TALK_SPEAK:
+        return "speak"
     if speaking_kind == KIND_MORNING_SUMMARY:
         return "happy"
     if session_active:

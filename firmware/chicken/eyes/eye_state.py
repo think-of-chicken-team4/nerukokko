@@ -12,6 +12,9 @@ from dataclasses import dataclass
 from enum import Enum
 
 
+PULSE_HZ = 1.6  # 起こすときの脈動の速さ（標準）
+
+
 class Expression(Enum):
     NORMAL = "normal"  # 通常
     SLEEPY = "sleepy"  # 眠い（就寝前）
@@ -20,6 +23,7 @@ class Expression(Enum):
     LISTEN = "listen"  # 聞いている（会話の録音中）
     THINK = "think"  # 考え中（返事を待っている）
     SLEEP = "sleep"  # 眠り（睡眠を記録中）
+    SPEAK = "speak"  # 話している（返事を話している間。目がリズムよく弾む）
 
 
 @dataclass(frozen=True)
@@ -32,6 +36,7 @@ class ExpressionParams:
     blink_gap: float  # まばたきの間隔の倍率
     gaze_range: float  # 視線のゆらぎの大きさの倍率
     pulse: float  # 大きさの脈動の振幅（起こすときに目を目立たせる）
+    pulse_hz: float = PULSE_HZ  # 脈動の速さ（1 秒あたりの回数）
 
 
 # 実機で見て調整する値
@@ -42,6 +47,7 @@ EXPRESSIONS: dict[Expression, ExpressionParams] = {
     Expression.WAKE: ExpressionParams(0.0, 0.0, 1.12, 0.75, 1.4, 0.8, 0.5, 0.05),
     Expression.LISTEN: ExpressionParams(0.0, 0.0, 1.08, 1.15, 0.8, 1.6, 0.15, 0.0),  # 目を大きく、視線は動かさず、まばたき少なめ
     Expression.THINK: ExpressionParams(0.18, 0.0, 0.98, 0.8, 0.8, 0.7, 1.8, 0.0),  # 少し目を細め、視線をきょろきょろさせる
+    Expression.SPEAK: ExpressionParams(0.0, 0.0, 1.02, 1.0, 1.0, 1.0, 0.35, 0.045, 3.2),  # 話すリズムで、目が小さく弾む。音には合わせない（実機で見て調整：D1）
     Expression.SLEEP: ExpressionParams(1.0, 0.0, 0.9, 0.9, 0.3, 4.0, 0.0, 0.0),  # 閉じた線で描く（eye_display の CLOSED_LID）。まばたきも視線もしない
 }
 
@@ -52,7 +58,6 @@ DOUBLE_BLINK_PROBABILITY = 0.15
 GAZE_INTERVAL_SEC = (1.5, 4.0)
 GAZE_SMOOTHING_PER_SEC = 6.0
 EXPRESSION_SMOOTHING_PER_SEC = 7.0  # 表情が切り替わる速さ
-PULSE_HZ = 1.6
 
 # 昼夜の切り替え（実機で測って決める値。照度の閾値は hw-verification C3 の結果と合わせる）
 LUX_DARK_BELOW = 10.0  # この照度（lux）を下回ったら「暗い」
@@ -102,7 +107,7 @@ class EyeState:
         self._params = _approach(self._params, EXPRESSIONS[self._expression], dt)
         openness = self._update_blink(now)
         self._update_gaze(now, dt)
-        pulse = self._params.pulse * math.sin(2.0 * math.pi * PULSE_HZ * now)
+        pulse = self._params.pulse * math.sin(2.0 * math.pi * self._params.pulse_hz * now)
         return EyeFrame(
             openness=openness,
             gaze_x=self._gaze[0],
@@ -166,6 +171,7 @@ def _values(params: ExpressionParams) -> tuple[float, ...]:
         params.blink_gap,
         params.gaze_range,
         params.pulse,
+        params.pulse_hz,
     )
 
 

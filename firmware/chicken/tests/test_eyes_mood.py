@@ -6,7 +6,7 @@ from __future__ import annotations
 import unittest
 
 from eyes.eye_state import EXPRESSIONS, Expression
-from eyes.mood import KIND_MORNING_SUMMARY, TALK_LISTEN, TALK_THINK, choose_expression
+from eyes.mood import KIND_MORNING_SUMMARY, TALK_LISTEN, TALK_SPEAK, TALK_THINK, choose_expression
 
 
 def choose(**overrides: object) -> str:
@@ -22,6 +22,7 @@ class ChooseExpressionTest(unittest.TestCase):
     def test_each_state(self) -> None:
         self.assertEqual(choose(talk_phase=TALK_LISTEN), "listen")
         self.assertEqual(choose(talk_phase=TALK_THINK), "think")
+        self.assertEqual(choose(talk_phase=TALK_SPEAK), "speak")
         self.assertEqual(choose(speaking_kind=KIND_MORNING_SUMMARY), "happy")
         self.assertEqual(choose(session_active=True), "sleep")
         self.assertEqual(choose(hour=21), "sleepy")
@@ -41,7 +42,7 @@ class ChooseExpressionTest(unittest.TestCase):
 
     def test_every_result_is_a_known_expression(self) -> None:
         known = {e.value for e in Expression}
-        for phase in (None, TALK_LISTEN, TALK_THINK):
+        for phase in (None, TALK_LISTEN, TALK_THINK, TALK_SPEAK):
             for kind in (None, KIND_MORNING_SUMMARY):
                 for active in (False, True):
                     for hour in (3, 12, 22):

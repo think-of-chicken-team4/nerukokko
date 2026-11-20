@@ -2,13 +2,13 @@
 
     python3 -m eyes.eye_display                          # 全画面（ラズパイの DSI 用）
     python3 -m eyes.eye_display --windowed               # PC でウィンドウ表示
-    python3 -m eyes.eye_display --expression sleepy      # 最初の表情を指定
+    python3 -m eyes.eye_display --expression speak       # 最初の表情を指定（normal・sleepy・happy・wake・listen・think・sleep・speak）
     python3 -m eyes.eye_display --darkness 0.0           # 昼の配色（0.0=昼、1.0=夜）
     python3 -m eyes.eye_display --save-frames out/       # 画面なしで表情ごとの PNG を保存して確認
 
-    python3 -m eyes.eye_display --link                   # 本体（app.py）と連携：状態を読み、タッチでメニュー・会話開始
+    python3 -m eyes.eye_display --link                   # 本体（app.py）と連携：中央をタップで会話、左上の歯車で音量
 
-連携なしのときのキー：1=通常 2=眠い 3=うれしい 4=起こす 8=聞いている 9=考え中 0=眠り、5=昼 6=夜 7=時刻で自動、Esc か Q で終了。
+連携なしのときのキー：1=通常 2=眠い 3=うれしい 4=起こす 8=聞いている 9=考え中 0=眠り -=話している、5=昼 6=夜 7=時刻で自動、5=昼 6=夜 7=時刻で自動、Esc か Q で終了。
 実機で調整する値（色・大きさ・位置）は下の定数にまとめている（Issue #28）。
 """
 
@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import datetime
 import logging
+import math
 import os
 import time
 from pathlib import Path
@@ -28,9 +29,11 @@ import integration_config as config
 from .eye_state import EXPRESSIONS, DarknessEstimator, EyeFrame, EyeState, Expression
 from .ipc import CommandSender, DisplayState, read_state
 from .menu import (
+    ALARM_VOLUME_DOWN_BUTTON,
+    ALARM_VOLUME_UP_BUTTON,
     BACK_BUTTON,
+    GEAR_BUTTON,
     SCREEN_SIZE as MENU_SCREEN_SIZE,
-    TALK_BUTTON,
     VOLUME_DOWN_BUTTON,
     VOLUME_UP_BUTTON,
     MenuState,
@@ -72,6 +75,7 @@ class Palette:
         self.background = _mix(DAY_BACKGROUND, NIGHT_BACKGROUND, darkness)
         self.eye = _mix(DAY_EYE, NIGHT_EYE, darkness)
         self.pupil = _mix(DAY_PUPIL, NIGHT_PUPIL, darkness)
+        self.text = _mix(DAY_PUPIL, NIGHT_EYE, darkness)  # 背景の上に直接書く文字：昼は暗い色、夜は明るい色
         self.closed_line = _mix(DAY_PUPIL, NIGHT_EYE, darkness)  # 閉じた目の線：昼は暗い色、夜は明るい色（背景と区別できるように）
 
 
@@ -92,6 +96,7 @@ KEY_TO_EXPRESSION = {
     pygame.K_8: Expression.LISTEN,
     pygame.K_9: Expression.THINK,
     pygame.K_0: Expression.SLEEP,
+    pygame.K_MINUS: Expression.SPEAK,
 }
 
 
@@ -147,45 +152,66 @@ def _draw_pupil(
     surface.set_clip(clip_before)
 
 
-# メニューの文字。日本語フォントがないときは英字で代用する（ラズパイには fonts-noto-cjk を入れる）
+# オプション画面の文字。日本語フォントがないときは英字で代用する（ラズパイには fonts-noto-cjk を入れる）
 FONT_CANDIDATES = "notosanscjkjp,notosansjp,notosanscjk,takaogothic,ipagothic,ipaexgothic,droidsansfallback,vlgothic"
-MENU_TEXT = {
-    "talk": ("話す", "TALK"),
-    "stop": ("話し終わった", "DONE"),  # 録音中は「話す」が、これに変わる
-    "think": ("考え中…", "..."),
+OPTION_TEXT = {
+    "voice": ("会話", "VOICE"),
+    "alarm": ("アラーム", "ALARM"),
     "back": ("もどる", "BACK"),
-    "volume": ("音量", "VOL"),
 }
+GEAR_TEETH = 8
+GEAR_FADE = 0.25  # 歯車を背景に近づける割合（0 で目と同じ色。目立たせすぎない程度に、昼でも見える濃さにする。実機で調整：D1）
 
 
-def load_fonts() -> tuple[tuple[pygame.font.Font, pygame.font.Font, pygame.font.Font], bool]:
-    """((大きい文字, 小さい文字, 長い文言用の中くらいの文字), 日本語が出るか)"""
+def load_fonts() -> tuple[tuple[pygame.font.Font, pygame.font.Font], bool]:
+    """((大きい文字, 小さい文字), 日本語が出るか)"""
     path = pygame.font.match_font(FONT_CANDIDATES)
-    return (pygame.font.Font(path, 110), pygame.font.Font(path, 52), pygame.font.Font(path, 78)), path is not None
+    return (pygame.font.Font(path, 110), pygame.font.Font(path, 52)), path is not None
 
 
-def draw_menu(surface: pygame.Surface, state: DisplayState, darkness: float, fonts: tuple[pygame.font.Font, ...], has_jp: bool) -> None:
-    """fonts は (大きい文字, 小さい文字, 中くらいの文字)。「話す」は大きく、「話し終わった」は中くらい、「もどる」は小さく"""
+def draw_gear(surface: pygame.Surface, darkness: float) -> None:
+    """左上の、オプションを開く歯車。背景に近い色で、目立たせすぎない"""
+    palette = Palette(darkness)
+    color = _mix(palette.text, palette.background, 0.45 + GEAR_FADE)  # 文字の色から、背景へ少しだけ寄せる
+    box = pygame.Rect(GEAR_BUTTON)
+    cx, cy = box.center
+    radius = box.width // 4
+    for i in range(GEAR_TEETH):
+        angle = 2.0 * math.pi * i / GEAR_TEETH
+        tooth = pygame.Rect(0, 0, radius // 2, radius // 2)
+        tooth.center = (cx + int(math.cos(angle) * radius * 1.35), cy + int(math.sin(angle) * radius * 1.35))
+        pygame.draw.rect(surface, color, tooth)
+    pygame.draw.circle(surface, color, (cx, cy), radius)
+    pygame.draw.circle(surface, palette.background, (cx, cy), radius // 2)
+
+
+def draw_options(
+    surface: pygame.Surface, state: DisplayState, darkness: float, fonts: tuple[pygame.font.Font, ...], has_jp: bool
+) -> None:
+    """オプション画面：会話の音量とアラームの音量（それぞれ「−」「＋」と、いまの値 1〜10）、「もどる」。fonts は (大きい文字, 小さい文字)"""
     palette = Palette(darkness)
     surface.fill(palette.background)
     label_color = palette.pupil
-    key = "talk" if not state.busy else ("stop" if state.talk_phase == "listen" else "think")
-    talk_text = MENU_TEXT[key][0 if has_jp else 1]
-    talk_fill = _mix(palette.eye, palette.background, 0.6) if key == "think" else palette.eye  # 返事待ちは薄くして押せないと示す
-    back_text = MENU_TEXT["back"][0 if has_jp else 1]
-    for rect, text, fill, font in ((TALK_BUTTON, talk_text, talk_fill, fonts[2] if key == "stop" else fonts[0]), (BACK_BUTTON, back_text, palette.eye, fonts[1])):
-        box = pygame.Rect(rect)
-        pygame.draw.rect(surface, fill, box, border_radius=40)
-        label = font.render(text, True, label_color)
-        surface.blit(label, label.get_rect(center=box.center))
-    for rect, text in ((VOLUME_DOWN_BUTTON, "−"), (VOLUME_UP_BUTTON, "＋" if has_jp else "+")):
-        box = pygame.Rect(rect)
-        pygame.draw.rect(surface, palette.eye, box, border_radius=40)
-        label = fonts[0].render(text, True, label_color)
-        surface.blit(label, label.get_rect(center=box.center))
-    volume_text = f"{MENU_TEXT['volume'][0 if has_jp else 1]} {round(state.volume * 10)}"
-    label = fonts[1].render(volume_text, True, label_color)
-    surface.blit(label, label.get_rect(center=(MENU_SCREEN_SIZE[0] // 2, 55)))  # いまの音量（1〜10）
+    plus = "＋" if has_jp else "+"
+    rows = (
+        ("voice", VOLUME_DOWN_BUTTON, VOLUME_UP_BUTTON, state.volume),
+        ("alarm", ALARM_VOLUME_DOWN_BUTTON, ALARM_VOLUME_UP_BUTTON, state.alarm_volume),
+    )
+    for key, down, up, value in rows:
+        for rect, text in ((down, "−"), (up, plus)):
+            box = pygame.Rect(rect)
+            pygame.draw.rect(surface, palette.eye, box, border_radius=40)
+            label = fonts[0].render(text, True, label_color)
+            surface.blit(label, label.get_rect(center=box.center))
+        row_y = down[1] + down[3] // 2
+        label = fonts[1].render(OPTION_TEXT[key][0 if has_jp else 1], True, palette.text)
+        surface.blit(label, label.get_rect(midleft=(30, row_y)))
+        label = fonts[0].render(str(round(value * 10)), True, palette.text)
+        surface.blit(label, label.get_rect(center=((down[0] + down[2] + up[0]) // 2, row_y)))
+    back = pygame.Rect(BACK_BUTTON)
+    pygame.draw.rect(surface, palette.eye, back, border_radius=40)
+    label = fonts[1].render(OPTION_TEXT["back"][0 if has_jp else 1], True, label_color)
+    surface.blit(label, label.get_rect(center=back.center))
 
 
 def run(windowed: bool, expression: Expression, darkness: float | None, link: bool = False) -> None:
@@ -234,12 +260,16 @@ def run(windowed: bool, expression: Expression, darkness: float | None, link: bo
                 link_state = received
                 state.set_expression(_expression_of(received))
             menu.tick(now, link_state)
+            if link_state.expression == "sleep" and menu.eyes_awake(now):
+                state.set_expression(Expression.NORMAL)  # 眠っている目を 1 回タップしたら、目を覚ます
         if auto:
             ambient.update(now, hour=datetime.datetime.now().hour)  # 照度センサーの値は、連携時に lux= で渡す
-        if link and menu.screen is Screen.MENU:
-            draw_menu(screen, link_state, ambient.value, fonts, has_jp)
+        if link and menu.screen is Screen.OPTIONS:
+            draw_options(screen, link_state, ambient.value, fonts, has_jp)
         else:
             draw_eyes(screen, state.update(now), ambient.value)
+            if link and not link_state.busy and not link_state.alarm_ringing:
+                draw_gear(screen, ambient.value)  # 話している最中・アラーム中は、歯車を出さない
         pygame.display.flip()
         clock.tick(config.DISPLAY_FPS)
     pygame.quit()
@@ -268,9 +298,12 @@ def save_frames(directory: Path) -> None:
             pygame.image.save(surface, str(directory / f"{expression.value}_{name}.png"))
     fonts, has_jp = load_fonts()
     for name, darkness in (("day", 0.0), ("night", 1.0)):
-        for busy in (False, True):
-            draw_menu(surface, DisplayState(busy=busy), darkness, fonts, has_jp)
-            pygame.image.save(surface, str(directory / f"menu{'_busy' if busy else ''}_{name}.png"))
+        draw_options(surface, DisplayState(volume=0.6), darkness, fonts, has_jp)
+        pygame.image.save(surface, str(directory / f"options_{name}.png"))
+        frame = EyeFrame(openness=1.0, gaze_x=0.0, gaze_y=0.0)
+        draw_eyes(surface, frame, darkness)
+        draw_gear(surface, darkness)
+        pygame.image.save(surface, str(directory / f"eyes_with_gear_{name}.png"))
     logger.info("表情ごとの PNG を保存しました：%s", directory)
     pygame.quit()
 
