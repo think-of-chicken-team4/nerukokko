@@ -27,6 +27,9 @@ class Screen(Enum):
 
 
 # 実機で調整する値は、integration_config.py（MENU_TIMEOUT_SEC）。ボタンの位置・大きさは、指で押しやすい大きさにする（D3）
+# 操作を送った直後は、「話す」ボタンのタッチを受け付けない（指が同じ場所をもう一度押した判定や、本体の状態が届くまでの二重押しを防ぐ）。
+# 実機で調整する（D3）。「話し終わった」が一瞬で消える問題の対策
+TALK_LOCKOUT_SEC = 1.0
 SCREEN_SIZE = (800, 480)
 TALK_BUTTON: Rect = (150, 110, 500, 150)
 BACK_BUTTON: Rect = (300, 310, 200, 100)
@@ -48,6 +51,7 @@ class MenuState:
         self._timeout = timeout_sec
         self.screen = Screen.EYES
         self._last_touch = 0.0
+        self._talk_locked_until = 0.0
 
     def tap(self, now: float, point: Point, state: DisplayState) -> MenuResult:
         """タッチ（指を置いた瞬間）を渡す。返り値で、画面と、本体に送る操作が分かる"""
@@ -62,9 +66,13 @@ class MenuState:
             self.screen = Screen.EYES
             return MenuResult(self.screen)
         if contains(TALK_BUTTON, point):
+            if now < self._talk_locked_until:
+                return MenuResult(self.screen)  # 操作を送った直後の、二重のタッチは無視する
             if not state.busy:
+                self._talk_locked_until = now + TALK_LOCKOUT_SEC
                 return MenuResult(self.screen, COMMAND_TALK)
             if state.talk_phase == "listen":
+                self._talk_locked_until = now + TALK_LOCKOUT_SEC
                 return MenuResult(self.screen, COMMAND_STOP_RECORDING)  # 録音中は、同じボタンが「話し終わった」になる
             # 返事待ちのあいだは、メニューに残して何もしない
         return MenuResult(self.screen)

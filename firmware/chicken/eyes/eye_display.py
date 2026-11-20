@@ -194,6 +194,7 @@ def run(windowed: bool, expression: Expression, darkness: float | None, link: bo
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN and link:  # DSI のタッチはマウスとして届く（マルチタッチなし）
                 result = menu.tap(now, event.pos, link_state)
+                logger.info("タッチ：位置=%s 画面=%s 会話=%s 送る操作=%s", event.pos, result.screen.value, link_state.talk_phase, result.command)
                 if result.command and sender:
                     sender.send(result.command)
                     logger.info("本体に送りました：%s", result.command)

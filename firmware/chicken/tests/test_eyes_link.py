@@ -128,6 +128,21 @@ class MenuTest(unittest.TestCase):
         self.assertEqual(m.tap(1.0, center(TALK_BUTTON), LISTENING).command, COMMAND_STOP_RECORDING)
         self.assertIsNone(m.tap(2.0, center(TALK_BUTTON), THINKING).command)  # 返事待ちは何もしない
 
+    def test_second_tap_right_after_talk_is_ignored(self) -> None:
+        m = MenuState(timeout_sec=20)
+        m.tap(0.0, (400, 240), NORMAL)
+        self.assertEqual(m.tap(1.0, center(TALK_BUTTON), NORMAL).command, COMMAND_TALK)
+        # 本体の状態が届く前でも、届いて「話し終わった」に変わった直後でも、1秒以内の同じ場所のタッチは無視する
+        self.assertIsNone(m.tap(1.2, center(TALK_BUTTON), NORMAL).command)
+        self.assertIsNone(m.tap(1.5, center(TALK_BUTTON), LISTENING).command)
+        self.assertEqual(m.tap(2.1, center(TALK_BUTTON), LISTENING).command, COMMAND_STOP_RECORDING)
+
+    def test_back_button_works_during_lockout(self) -> None:
+        m = MenuState(timeout_sec=20)
+        m.tap(0.0, (400, 240), NORMAL)
+        m.tap(1.0, center(TALK_BUTTON), NORMAL)
+        self.assertEqual(m.tap(1.1, center(BACK_BUTTON), LISTENING).screen, Screen.EYES)
+
     def test_talk_phase_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "display.json"
